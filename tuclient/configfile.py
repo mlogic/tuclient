@@ -28,33 +28,43 @@ try:
 except ImportError:
     from ConfigParser import ConfigParser
 
+import logging
 from tuclient import ConfigBase
 from .common import *
 
 
 class ConfigFile(ConfigBase):
-    def __init__(self, logger, *args):
-        """Load one or more config files
+    def __init__(self, logger, system_type, host_name, *args):
+        """Load a configuration file
 
-        The parameter(s) are passed directly to ConfigParser.read().
+        If a system_type is supplied, such as "gateway", "client", or "engine",
+        configuration options for that specific system type override options
+        in the [general] section. Similarly, if a host name is supplied, the
+        options under the section of that specific host name override other
+        options.
+
+        The parameters after system_type and host_name are passed directly to
+        ConfigParser.read().
+
+        :param system_type: the type of the system to read configuration for
+        :param host_name: the host name of the system
         """
-        super().__init__(logger)
-        self._config = ConfigParser()
-        print(*args)
-        self._logger.info('Loaded config files: ' + str(self._config.read(*args)))
+        super().__init__(logger, system_type, host_name)
+        # Parent's init should've loaded the default values in.
+        cp = ConfigParser(defaults=self._config)
+        self.log(logging.INFO, 'Loaded config files: ' + str(cp.read(*args)))
+        # We use the [system_type] section in our config file to overwrite the default values.
+        self._config = cp
+        if system_type:
+            if system_type in self._config.sections():
+                self._config['DEFAULT'].update(self._config[system_type])
+            if host_name and system_type + '.' + host_name in self._config.sections():
+                self._config = self._config[system_type + '.' + host_name]
+            else:
+                self._config = self._config['DEFAULT']
+        else:
+            self._config = self._config['DEFAULT']
 
     @overrides(ConfigBase)
     def get_config(self):
         return self._config
-
-    @overrides(ConfigBase)
-    def db_type(self):
-        dbstr = self._config['global']['db']
-        colon_pos = dbstr.index(':')
-        return dbstr[:colon_pos]
-
-    @overrides(ConfigBase)
-    def db_path(self):
-        dbstr = self._config['global']['db']
-        colon_pos = dbstr.index(':')
-        return dbstr[colon_pos+1:]

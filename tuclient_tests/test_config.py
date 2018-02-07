@@ -34,9 +34,40 @@ class TestConfig(unittest.TestCase):
     def test_parsing_conf_file(self):
         logger = logging.getLogger()
         logger.addHandler(logging.StreamHandler(sys.stdout))
-        config = ConfigFile(logger, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file.ini', ))
+        config = ConfigFile(logger, None, None, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file.ini', ))
         self.assertEqual('mongodb', config.db_type())
         self.assertEqual('/home/tsg/dbfile', config.db_path())
+        # The values in this config file's [DEFAULT] section should overwrite the values
+        # from the default config file.
+        self.assertEqual('/var/log/default_tu_log_file', config.log_file())
+        self.assertEqual('/var/log/default_tu_error_log_file', config.error_log_file())
+        self.assertEqual(logging.DEBUG, config.logging_level())
+
+    def test_overriding_config(self):
+        config = ConfigFile(None, 'gateway', None, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file.ini', ))
+        self.assertEqual('/var/log/tugateway/log', config.log_file())
+        self.assertEqual('/var/log/tugateway/error_log', config.error_log_file())
+        self.assertEqual(logging.DEBUG, config.logging_level())
+
+        config = ConfigFile(None, 'client', 'host_1', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file.ini', ))
+        self.assertEqual('/var/log/tuclient_host_1/log', config.log_file())
+        # client.host_1 doesn't have error_log_file, so the value in [client] should be used
+        self.assertEqual('/var/log/tuclient/error_log', config.error_log_file())
+        self.assertEqual(logging.DEBUG, config.logging_level())
+
+        # host_x doesn't exist
+        config = ConfigFile(None, 'client', 'host_x', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file.ini', ))
+        self.assertEqual('/var/log/tuclient/log', config.log_file())
+        # client.host_1 doesn't have error_log_file, so the value in [client] should be used
+        self.assertEqual('/var/log/tuclient/error_log', config.error_log_file())
+        self.assertEqual(logging.DEBUG, config.logging_level())
+
+    def test_empty_config_file(self):
+        config = ConfigFile(None, 'gateway', None, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file_empty.ini', ))
+        # Default values from tuclient/default_conf_file.ini should be used here
+        self.assertEqual('/var/log/tu/log', config.log_file())
+        self.assertEqual('/var/log/tu/error_log', config.error_log_file())
+        self.assertEqual(logging.WARNING, config.logging_level())
 
 
 if __name__ == '__main__':
