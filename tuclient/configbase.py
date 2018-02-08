@@ -95,11 +95,6 @@ class ConfigBase(object):
         """Return the path to the log file"""
         return self.get_config()['log_file']
 
-    def error_log_file(self):
-        # type: () -> str
-        """Return the path to the error log file"""
-        return self.get_config()['error_log_file']
-
     def logging_level(self):
         """Return the logging level as instructed by the config
         :return: logging level
