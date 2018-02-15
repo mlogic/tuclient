@@ -33,7 +33,9 @@ setup(name='tuclient',
           'pyzmq',
           'python-daemon',
           'Sphinx',
-          'sphinx_rtd_theme'],
+          'sphinx_rtd_theme',
+          'typing',
+      ],
 
       # Metadata for PyPI
       author='Yan Li',

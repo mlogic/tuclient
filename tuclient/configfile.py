@@ -1,5 +1,4 @@
-"""ConfigFile of TuneUp.ai Client
-"""
+"""ConfigFile of TuneUp.ai Client"""
 # Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
 # All rights reserved.
 #
@@ -16,6 +15,7 @@
 # License along with this library; if not, see
 # https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
 from __future__ import absolute_import, division, print_function, unicode_literals
+from typing import Any, Optional
 
 __author__ = 'Yan Li'
 __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
@@ -35,6 +35,7 @@ from .common import *
 
 class ConfigFile(ConfigBase):
     def __init__(self, logger, system_type, host_name, *args):
+        # type: (Optional[logging.Logger], Optional[str], Optional[str], *Any) -> None
         """Load a configuration file
 
         If a system_type is supplied, such as "gateway", "client", or "engine",

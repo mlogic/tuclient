@@ -1,4 +1,4 @@
-# TuneUp.ai Client
+"""Mock TUClient Extension class"""
 # Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
 # All rights reserved.
 #
@@ -15,15 +15,23 @@
 # License along with this library; if not, see
 # https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
 from __future__ import absolute_import, division, print_function, unicode_literals
+from typing import List
 
-__author__ = 'Yan Li'
-__copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
-__license__ = 'LGPLv2.1'
-__docformat__ = 'reStructuredText'
+from tuclient import *
 
-from .common import *
-from .configbase import ConfigBase
-from .configfile import ConfigFile
-from .protocol_extension_base import ProtocolExtensionBase
-from .tulogging import *
-from .tuclient import *
+
+class Getter(GetterExtensionBase):
+    @overrides(GetterExtensionBase)
+    def collect(self):
+        # type: () -> List[float]
+        """Collect Performance Indicators"""
+        return [1, 2]
+
+
+class Setter(SetterExtensionBase):
+    @overrides(SetterExtensionBase)
+    def action(self, actions):
+        # type: (List[float]) -> None
+        """Perform actions
+        :param actions: a list of actions to perform"""
+        pass

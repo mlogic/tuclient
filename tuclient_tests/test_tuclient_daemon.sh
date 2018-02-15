@@ -1,4 +1,6 @@
-# TuneUp.ai Client
+#!/bin/bash
+# Test the TuneUp.ai Client Daemon
+# 
 # Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
 # All rights reserved.
 #
@@ -14,16 +16,27 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library; if not, see
 # https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
-from __future__ import absolute_import, division, print_function, unicode_literals
+set -e -u
+cd `dirname $0`/..
 
-__author__ = 'Yan Li'
-__copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
-__license__ = 'LGPLv2.1'
-__docformat__ = 'reStructuredText'
+TMPFILE=`mktemp`
+TUCLIENT_SERVICE_CMD="./tuclient_daemon.sh -c tuclient_tests/test_service_conf.ini -i 1"
+$TUCLIENT_SERVICE_CMD status &>$TMPFILE
+grep -q "not running" $TMPFILE
 
-from .common import *
-from .configbase import ConfigBase
-from .configfile import ConfigFile
-from .protocol_extension_base import ProtocolExtensionBase
-from .tulogging import *
-from .tuclient import *
+rm -f /tmp/test_tuclient_log.txt
+trap "{ $TUCLIENT_SERVICE_CMD stop; exit 255; }" EXIT
+$TUCLIENT_SERVICE_CMD start
+sleep 3
+$TUCLIENT_SERVICE_CMD status &>$TMPFILE
+grep -q "is running as" $TMPFILE
+grep -q "Collected: \[1, 2\]" /tmp/test_tuclient_log.txt
+
+trap "" EXIT
+$TUCLIENT_SERVICE_CMD stop
+sleep 2
+grep -q "TUClient stopped" /tmp/test_tuclient_log.txt
+$TUCLIENT_SERVICE_CMD status &>$TMPFILE
+grep -q "not running" $TMPFILE
+
+echo $0 PASS

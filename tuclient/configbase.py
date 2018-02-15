@@ -1,5 +1,4 @@
-"""ConfigBase of TuneUp.ai Client
-"""
+"""ConfigBase of TuneUp.ai Client"""
 # Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
 # All rights reserved.
 #
@@ -27,6 +26,7 @@ import abc
 from configparser import ConfigParser
 import logging
 import os
+from .tulogging import get_file_logger
 
 
 class ConfigBase(object):
@@ -74,7 +74,19 @@ class ConfigBase(object):
         """
         pass
 
+    def client_id(self):
+        # type: () -> int
+        """Return client ID
+        :return: client ID"""
+        return int(self.get_config()['client_id'])
+
+    def daemon_output_dir(self):
+        # type: () -> str
+        """Return the location for storing daemons' stdout and stderr"""
+        return self.get_config()['daemon_output_dir']
+
     def db_type(self):
+        # type: () -> str
         """Return the type of database as instructed by the config
         :return: type of database
         """
@@ -83,6 +95,7 @@ class ConfigBase(object):
         return dbstr[:colon_pos]
 
     def db_path(self):
+        # type: () -> str
         """Return the path of DB as instructed by the config
         :return: path to access the database
         """
@@ -90,13 +103,37 @@ class ConfigBase(object):
         colon_pos = dbstr.index(':')
         return dbstr[colon_pos+1:]
 
+    def gateway_address(self):
+        # type: () -> str
+        """Get the gateway address
+        :return: gateway address"""
+        return self.get_config()['gateway_address']
+
+    def get_logger(self):
+        # type: () -> logging.Logger
+        """Get a logger as instructed by the config
+        :return: the logger
+        """
+        logger = get_file_logger(self.log_file())
+        logger.setLevel(self.logging_level())
+        return logger
+
     def log_file(self):
         # type: () -> str
-        """Return the path to the log file"""
+        """Return the path to the log file
+
+        For most cases you should use get_logger() instead.
+
+        :return: name of the log file
+        """
         return self.get_config()['log_file']
 
     def logging_level(self):
+        # type: () -> int
         """Return the logging level as instructed by the config
+
+        For most cases you should use get_logger() instead.
+
         :return: logging level
         """
         levelstr = self.get_config()['logging_level'].upper()
@@ -107,3 +144,36 @@ class ConfigBase(object):
         """Write log message at level"""
         if self._logger:
             self._logger.log(level, message, *args, **kwargs)
+
+    def protocol(self):
+        # type: () -> str
+        """Get the protocol name
+
+        :return: protocol name"""
+        return self.get_config()['protocol']
+
+    def getter_module(self):
+        # type: () -> str
+        """Get the getter module name
+
+        :return: getter module name"""
+        return self.get_config()['getter_module']
+
+    def setter_module(self):
+        # type: () -> str
+        """Get the setter module name
+
+        :return: setter module name"""
+        return self.get_config()['setter_module']
+
+    def pidfile(self):
+        # type: () -> str
+        """Get the location for storing PID file
+        :return: path for storing the PID files"""
+        return self.get_config()['pidfile']
+
+    def tick_len(self):
+        # type: () -> int
+        """Get the duration of a tick in seconds
+        :return tick length in sections"""
+        return self.get_config()['tick_len']

@@ -21,3 +21,4 @@ cd `dirname $0`
 
 # Use Test Discovery to run all test cases
 python -m unittest
+tuclient_tests/test_tuclient_daemon.sh
