@@ -73,7 +73,7 @@ if __name__ == '__main__':
     # Protocol
     protocol_name = config.protocol()
     if protocol_name == 'zmq':
-        protocol = ZMQProtocol(logger, config, tuclient_id)
+        protocol = ZMQProtocol(logger, tuclient_id, config.gateway_address())
     else:
         raise ValueError('Unsupported protocol ' + protocol_name)
 

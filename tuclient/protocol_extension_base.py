@@ -23,17 +23,15 @@ __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
 import abc
-from .configbase import ConfigBase
 import logging
 
 
 class ProtocolExtensionBase(object):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, logger, config, id):
-        # type: (logging.Logger, ConfigBase, int) -> None
+    def __init__(self, logger, id):
+        # type: (logging.Logger, int) -> None
         self._logger = logger
-        self._config = config
         self._id = id
 
     def __del__(self):

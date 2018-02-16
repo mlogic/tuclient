@@ -30,10 +30,10 @@ import zmq
 class ZMQProtocol(ProtocolExtensionBase):
     PROTOCOL_VER = 1
 
-    def __init__(self, logger, config, id):
-        # type: (logging.Logger, ConfigBase, int) -> None
-        super().__init__(logger, config, id)
-        self._gateway_address = config.gateway_address()
+    def __init__(self, logger, id, gateway_address):
+        # type: (logging.Logger, int, str) -> None
+        super().__init__(logger, id)
+        self._gateway_address = gateway_address
         self._context = None  # type: Optional[zmq.Context]
         self._socket = None   # type: Optional[zmq.Socket]
         self._poller = None   # type: Optional[zmq.Poller]
