@@ -41,3 +41,10 @@ class SetterExtensionBase(object):
         """Perform actions
         :param actions: a list of actions to perform"""
         pass
+
+    @property
+    @abc.abstractmethod
+    def parameter_names(self):
+        # type: () -> List[str]
+        """Return the list of all parameters"""
+        pass

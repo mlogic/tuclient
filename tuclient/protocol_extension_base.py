@@ -29,10 +29,10 @@ import logging
 class ProtocolExtensionBase(object):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, logger, id):
-        # type: (logging.Logger, int) -> None
+    def __init__(self, logger, node_name):
+        # type: (logging.Logger, str) -> None
         self._logger = logger
-        self._id = id
+        self._node_name = node_name
 
     def __del__(self):
         self.disconnect()

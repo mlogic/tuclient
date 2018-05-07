@@ -30,9 +30,9 @@ import zmq
 class ZMQProtocol(ProtocolExtensionBase):
     PROTOCOL_VER = 1
 
-    def __init__(self, logger, id, gateway_address):
-        # type: (logging.Logger, int, str) -> None
-        super().__init__(logger, id)
+    def __init__(self, logger, node_name, gateway_address):
+        # type: (logging.Logger, str, str) -> None
+        super().__init__(logger, node_name)
         self._gateway_address = gateway_address
         self._context = None  # type: Optional[zmq.Context]
         self._socket = None   # type: Optional[zmq.Socket]
@@ -46,7 +46,8 @@ class ZMQProtocol(ProtocolExtensionBase):
         if not self._context:
             self._context = zmq.Context()
         self._socket = self._context.socket(zmq.DEALER)
-        self._socket.setsockopt(zmq.IDENTITY, str(self._id).encode('ascii'))
+        # http://api.zeromq.org/4-1:zmq-setsockopt#toc16
+        self._socket.setsockopt(zmq.IDENTITY, self._node_name.encode('ascii'))
         # Don't wait if there's any linger messages upon close.
         self._socket.setsockopt(zmq.LINGER, 0)
         target = 'tcp://{gateway}'.format(gateway=self._gateway_address)

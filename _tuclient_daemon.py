@@ -59,8 +59,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='TuneUp.ai Client daemon')
     parser.add_argument('-c', '--conf', metavar='CONF_FILE', type=str, nargs=1,
                         help='Configuration file.')
-    parser.add_argument('-i', '--id', metavar='CLIENT_ID', type=int, nargs=1,
-                        help='Client ID. This option overwrites ID set in the configuration file.')
+    parser.add_argument('-n', '--name', metavar='CLIENT_NAME', type=str, nargs=1,
+                        help='Client name. This option overwrites the name in the configuration file.')
     parser.add_argument('-p', '--pidfile', metavar='PIDFILE', type=str, nargs=1,
                         help='PID file name')
     args = parser.parse_args()
@@ -68,12 +68,13 @@ if __name__ == '__main__':
     logger = config.get_logger()
 
     # ID
-    tuclient_id = args.id[0] if 'id' in args else config.client_id()
+    node_name = args.name[0] if 'name' in args else config.node_name()
+    belong_to_cluster = config.cluster_name()
 
     # Protocol
     protocol_name = config.protocol()
     if protocol_name == 'zmq':
-        protocol = ZMQProtocol(logger, tuclient_id, config.gateway_address())
+        protocol = ZMQProtocol(logger, node_name, config.gateway_address())
     else:
         raise ValueError('Unsupported protocol ' + protocol_name)
 
@@ -92,8 +93,8 @@ if __name__ == '__main__':
     if 'tick_len' in config.get_config():
         tuclient_kwargs['tick_len'] = config.tick_len()
 
-    client = TUClient(logger, id=tuclient_id, protocol=protocol, getters=[getter], setters=[setter],
-                      **tuclient_kwargs)
+    client = TUClient(logger, cluster_name=belong_to_cluster, node_name=node_name, protocol=protocol,
+                      getters=[getter], setters=[setter], **tuclient_kwargs)
 
     pidfile_name = config.pidfile()
     pidfile = PIDLockFile(pidfile_name, timeout=-1)
@@ -102,8 +103,8 @@ if __name__ == '__main__':
     context = daemon.DaemonContext(
         # working_directory='/var/lib/foo',
         pidfile=pidfile,
-        stdout=open(os.path.join(daemon_output_dir, 'tuclient_{id}_stdout'.format(id=tuclient_id)), 'w+'),
-        stderr=open(os.path.join(daemon_output_dir, 'tuclient_{id}_stderr'.format(id=tuclient_id)), 'w+'),
+        stdout=open(os.path.join(daemon_output_dir, 'tuclient_{name}_stdout'.format(name=node_name)), 'w+'),
+        stderr=open(os.path.join(daemon_output_dir, 'tuclient_{name}_stderr'.format(name=node_name)), 'w+'),
     )
 
     context.signal_map = {

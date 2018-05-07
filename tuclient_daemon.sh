@@ -27,13 +27,13 @@ EOF
 
 CONFFILE=/etc/tuclient/tuclient.ini
 ARGS=()
-while getopts "c:i:" var; do
+while getopts "c:n:" var; do
     case $var in
         c)
             CONFFILE=$OPTARG
             ;;
-        i)
-            ARGS+=(-i $OPTARG)
+        n)
+            ARGS+=(-n $OPTARG)
             ;;
 	?)
             echo "Unknown argument"

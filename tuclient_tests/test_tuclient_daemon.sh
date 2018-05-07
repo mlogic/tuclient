@@ -20,7 +20,7 @@ set -e -u
 cd `dirname $0`/..
 
 TMPFILE=`mktemp`
-TUCLIENT_SERVICE_CMD="./tuclient_daemon.sh -c tuclient_tests/test_client_conf.ini -i 1"
+TUCLIENT_SERVICE_CMD="./tuclient_daemon.sh -c tuclient_tests/test_client_conf.ini -n client1"
 $TUCLIENT_SERVICE_CMD status &>$TMPFILE
 grep -q "not running" $TMPFILE
 

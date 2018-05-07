@@ -70,21 +70,27 @@ import zlib
 class TUClient:
     """The TuneUp.ai Client Class"""
 
-    def __init__(self, logger, id, protocol, getters, setters, tick_len=1, debugging_level=0):
-        # type: (logging.Logger, int, ProtocolExtensionBase, List[GetterExtensionBase], List[SetterExtensionBase], int, int) -> None
+    def __init__(self, logger, cluster_name, node_name, protocol, getters, setters, tick_len=1, debugging_level=0):
+        # type: (logging.Logger, str, str, ProtocolExtensionBase, Optional[List[GetterExtensionBase]], Optional[List[SetterExtensionBase]], int, int) -> None
         """ Create a TUClient instance
 
         :param logger: a Logger instance
-        :param id: the ID of this client
+        :param cluster_name: the name of the cluster this client belongs to
+        :param node_name: a string that uniquely identifies this client
         :param protocol: a ProtocolExtensionBase instance
         :param debugging_level: 0: don't print debug info, 1: print debug info, 2: more debug info
         """
-        assert isinstance(id, int)
         self._logger = logger
-        self._id = id
+        if cluster_name.find('|') != -1:
+            raise ValueError('Cluster name cannot have the \'|\' character')
+        if node_name.find('|') != -1:
+            raise ValueError('Node name cannot have the \'|\' character')
+        self._cluster_name = cluster_name
+        self._node_name = node_name
         self._protocol = protocol
         self._debugging_level = debugging_level
-        self._logger.info('Client on {hostname} created with ID {id}'.format(hostname=socket.gethostname(), id=self._id))
+        self._logger.info('Client {name} on {hostname} has been created'.format(name=self._node_name,
+                                                                                hostname=socket.gethostname()))
         self._getters = getters
         self._setters = setters
         self._tick_len = tick_len
@@ -125,7 +131,7 @@ class TUClient:
         try:
             self._logger.info('TUClient started')
             while not self._stopped:
-                if self._getters:
+                if self._getters is not None and len(self._getters) > 0:
                     ts = time.time()
                     if ts - (self._last_collect_second + self._collect_time_decimal) >= self._tick_len - 0.01:
                         # This must be updated *before* collecting to prevent the send time from

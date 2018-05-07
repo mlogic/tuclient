@@ -74,11 +74,17 @@ class ConfigBase(object):
         """
         pass
 
-    def client_id(self):
-        # type: () -> int
-        """Return client ID
-        :return: client ID"""
-        return int(self.get_config()['client_id'])
+    def node_name(self):
+        # type: () -> str
+        """Return the node name of the client
+        :return: node name"""
+        return self.get_config()['node_name']
+
+    def cluster_name(self):
+        # type: () -> str
+        """Return the name of the cluster this client belongs to
+        :return: the name of the cluster this client belongs to"""
+        return self.get_config()['cluster_name']
 
     def daemon_output_dir(self):
         # type: () -> str

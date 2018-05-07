@@ -40,3 +40,10 @@ class GetterExtensionBase(object):
         # type: () -> List[float]
         """Collect Performance Indicators"""
         pass
+
+    @property
+    @abc.abstractmethod
+    def pi_names(self):
+        # type: () -> List[str]
+        """Return the list of all Performance Indicator names"""
+        pass
