@@ -24,15 +24,16 @@ __docformat__ = 'reStructuredText'
 
 import abc
 import logging
+from uuid import UUID
 
 
 class ProtocolExtensionBase(object):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, logger, node_name):
-        # type: (logging.Logger, str) -> None
+    def __init__(self, logger, client_id):
+        # type: (logging.Logger, UUID) -> None
         self._logger = logger
-        self._node_name = node_name
+        self._client_id = client_id
 
     def __del__(self):
         self.disconnect()

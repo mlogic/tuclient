@@ -24,15 +24,16 @@ __docformat__ = 'reStructuredText'
 
 import logging
 from tuclient import *
+from uuid import *
 import zmq
 
 
 class ZMQProtocol(ProtocolExtensionBase):
     PROTOCOL_VER = 1
 
-    def __init__(self, logger, node_name, gateway_address):
-        # type: (logging.Logger, str, str) -> None
-        super().__init__(logger, node_name)
+    def __init__(self, logger, client_id, gateway_address):
+        # type: (logging.Logger, UUID, str) -> None
+        super().__init__(logger, client_id)
         self._gateway_address = gateway_address
         self._context = None  # type: Optional[zmq.Context]
         self._socket = None   # type: Optional[zmq.Socket]
@@ -47,7 +48,7 @@ class ZMQProtocol(ProtocolExtensionBase):
             self._context = zmq.Context()
         self._socket = self._context.socket(zmq.DEALER)
         # http://api.zeromq.org/4-1:zmq-setsockopt#toc16
-        self._socket.setsockopt(zmq.IDENTITY, self._node_name.encode('ascii'))
+        self._socket.setsockopt(zmq.IDENTITY, self._client_id.bytes)
         # Don't wait if there's any linger messages upon close.
         self._socket.setsockopt(zmq.LINGER, 0)
         target = 'tcp://{gateway}'.format(gateway=self._gateway_address)

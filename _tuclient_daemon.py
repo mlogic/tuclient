@@ -59,8 +59,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='TuneUp.ai Client daemon')
     parser.add_argument('-c', '--conf', metavar='CONF_FILE', type=str, nargs=1,
                         help='Configuration file.')
-    parser.add_argument('-n', '--name', metavar='CLIENT_NAME', type=str, nargs=1,
-                        help='Client name. This option overwrites the name in the configuration file.')
     parser.add_argument('-p', '--pidfile', metavar='PIDFILE', type=str, nargs=1,
                         help='PID file name')
     args = parser.parse_args()
@@ -68,13 +66,14 @@ if __name__ == '__main__':
     logger = config.get_logger()
 
     # ID
-    node_name = args.name[0] if 'name' in args else config.node_name()
-    belong_to_cluster = config.cluster_name()
+    client_id = uuid1()
+    node_name = config.node_name()
+    cluster_name = config.cluster_name()
 
     # Protocol
     protocol_name = config.protocol()
     if protocol_name == 'zmq':
-        protocol = ZMQProtocol(logger, node_name, config.gateway_address())
+        protocol = ZMQProtocol(logger, client_id, config.gateway_address())
     else:
         raise ValueError('Unsupported protocol ' + protocol_name)
 
@@ -93,7 +92,7 @@ if __name__ == '__main__':
     if 'tick_len' in config.get_config():
         tuclient_kwargs['tick_len'] = config.tick_len()
 
-    client = TUClient(logger, cluster_name=belong_to_cluster, node_name=node_name, protocol=protocol,
+    client = TUClient(logger, client_id, cluster_name=cluster_name, node_name=node_name, protocol=protocol,
                       getters=[getter], setters=[setter], **tuclient_kwargs)
 
     pidfile_name = config.pidfile()

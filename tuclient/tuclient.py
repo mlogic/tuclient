@@ -64,27 +64,26 @@ from .setter_extension_base import SetterExtensionBase
 import socket
 import time
 from .tulogging import *
+from uuid import *
 import zlib
 
 
 class TUClient:
     """The TuneUp.ai Client Class"""
 
-    def __init__(self, logger, cluster_name, node_name, protocol, getters, setters, tick_len=1, debugging_level=0):
-        # type: (logging.Logger, str, str, ProtocolExtensionBase, Optional[List[GetterExtensionBase]], Optional[List[SetterExtensionBase]], int, int) -> None
+    def __init__(self, logger, client_id, cluster_name, node_name, protocol, getters, setters, tick_len=1, debugging_level=0):
+        # type: (logging.Logger, UUID, str, str, ProtocolExtensionBase, Optional[List[GetterExtensionBase]], Optional[List[SetterExtensionBase]], int, int) -> None
         """ Create a TUClient instance
 
         :param logger: a Logger instance
+        :param client_id: the UUID of this client
         :param cluster_name: the name of the cluster this client belongs to
         :param node_name: a string that uniquely identifies this client
         :param protocol: a ProtocolExtensionBase instance
         :param debugging_level: 0: don't print debug info, 1: print debug info, 2: more debug info
         """
         self._logger = logger
-        if cluster_name.find('|') != -1:
-            raise ValueError('Cluster name cannot have the \'|\' character')
-        if node_name.find('|') != -1:
-            raise ValueError('Node name cannot have the \'|\' character')
+        self._client_id = client_id
         self._cluster_name = cluster_name
         self._node_name = node_name
         self._protocol = protocol
@@ -124,6 +123,22 @@ class TUClient:
         # ZMQ context must be created here because this function may be executed in a separate
         # process/thread
         self._protocol.connect_to_gateway()
+
+        # Send the PI and Parameter Metadata
+        # Merge all PI names to one list
+        pi_metadata = []
+        for getter in self._getters:
+            if getter.pi_names is not None:
+                assert isinstance(getter.pi_names, list)
+                pi_metadata += getter.pi_names
+        # Merge all parameter names to one list
+        param_metadata = []
+        for setter in self._setters:
+            if setter.parameter_names is not None:
+                assert isinstance(setter.parameter_names, list)
+                param_metadata += setter.parameter_names
+
+        self.timestamp_and_send_list([b'PIPMETA', pi_metadata, param_metadata])
 
         # GC causes unplanned stall and disrupts precisely timed collection.
         # Disable it and do it manually before sleeping.
