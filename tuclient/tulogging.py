@@ -57,17 +57,21 @@ __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
 import atexit
+import io
 import logging
 import logging.handlers
 import os
 
 _STDOUT_LOGGER = 1
 _FILE_LOGGER = 2
+_MEMORY_LOGGER = 3
+
 _logger = None
 _logger_type = None
 FORMAT = "[%(asctime)s - %(filename)s:%(lineno)s - %(funcName)10s() ] %(message)s"
 _log_file_handler = None
 _memory_handler = None
+memory_logger_stringio = None
 
 
 def get_console_logger():
@@ -80,7 +84,7 @@ def get_console_logger():
     """
     global _logger
     global _logger_type
-    if _logger:
+    if _logger is not None:
         assert _logger_type == _STDOUT_LOGGER, "Global logger was already created and isn't a console logger"
         return _logger
     else:
@@ -92,7 +96,7 @@ def get_console_logger():
 
 
 def flush_log():
-    if _memory_handler:
+    if _memory_handler is not None:
         _memory_handler.flush()
 
 
@@ -107,7 +111,7 @@ def get_file_logger(filename, lazy_flush=False):
     global _logger
     global _logger_type
     global _log_file_handler
-    if _logger:
+    if _logger is not None:
         assert _logger_type == _FILE_LOGGER, "Global logger was already created and isn't a file logger"
         return _logger
     else:
@@ -137,3 +141,28 @@ def get_file_logger(filename, lazy_flush=False):
 
         atexit.register(flush_log)
         return _logger
+
+
+def get_memory_logger():
+    """Get a logger and stores all messages in memory and writes to stderr
+
+    This memory logger keeps everything in memory and can use a huge amount of memory. Use it
+    for test cases only.
+
+    Use tulogging.memory_logger_stringio.getvalue() to get the log so far."""
+    global _logger
+    global _logger_type
+    global memory_logger_stringio
+    if _logger is not None:
+        assert _logger_type == _MEMORY_LOGGER, "Global logger was already created and isn't a memory logger"
+        return _logger
+    memory_logger_stringio = io.StringIO()
+    streamhandler = logging.StreamHandler(memory_logger_stringio)
+    streamhandler.setFormatter(logging.Formatter(FORMAT))
+    stderrhandler = logging.StreamHandler()
+    stderrhandler.setFormatter(logging.Formatter(FORMAT))
+    _logger = logging.getLogger()
+    _logger.addHandler(streamhandler)
+    _logger.addHandler(stderrhandler)
+    _logger_type = _MEMORY_LOGGER
+    return _logger
