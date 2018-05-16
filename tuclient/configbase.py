@@ -80,6 +80,12 @@ class ConfigBase(object):
         :return: node name"""
         return self.get_config()['node_name']
 
+    def api_secret_key(self):
+        # type: () -> str
+        """Return the API Secret Key of the client
+        :return: API Secret Key"""
+        return self.get_config()['api_secret_key']
+
     def cluster_name(self):
         # type: () -> str
         """Return the name of the cluster this client belongs to

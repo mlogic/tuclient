@@ -49,30 +49,34 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 # OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import absolute_import, division, print_function, unicode_literals
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 __author__ = 'Yan Li'
 __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
+from collections import deque
 import gc
 from .getter_extension_base import GetterExtensionBase
-import pickle
 from .protocol_extension_base import ProtocolExtensionBase
 from .setter_extension_base import SetterExtensionBase
 import socket
+from threading import RLock
 import time
 from .tulogging import *
 from uuid import *
-import zlib
+
+
+class CommunicationError(Exception):
+    pass
 
 
 class TUClient:
     """The TuneUp.ai Client Class"""
 
-    def __init__(self, logger, client_id, cluster_name, node_name, protocol, getters, setters, tick_len=1, debugging_level=0):
-        # type: (logging.Logger, UUID, str, str, ProtocolExtensionBase, Optional[List[GetterExtensionBase]], Optional[List[SetterExtensionBase]], int, int) -> None
+    def __init__(self, logger, client_id, cluster_name, node_name, api_secret_key, protocol, getters, setters, network_timeout=60, tick_len=1, debugging_level=0):
+        # type: (logging.Logger, UUID, str, str, str, ProtocolExtensionBase, Optional[List[GetterExtensionBase]], Optional[List[SetterExtensionBase]], int, int, int) -> None
         """ Create a TUClient instance
 
         :param logger: a Logger instance
@@ -80,13 +84,16 @@ class TUClient:
         :param cluster_name: the name of the cluster this client belongs to
         :param node_name: a string that uniquely identifies this client
         :param protocol: a ProtocolExtensionBase instance
+        :param network_timeout: timeout before retrying connection
         :param debugging_level: 0: don't print debug info, 1: print debug info, 2: more debug info
         """
         self._logger = logger
         self._client_id = client_id
         self._cluster_name = cluster_name
         self._node_name = node_name
+        self._api_secret_key = api_secret_key
         self._protocol = protocol
+        self._network_timeout = network_timeout
         self._debugging_level = debugging_level
         self._logger.info('Client {name} on {hostname} has been created'.format(name=self._node_name,
                                                                                 hostname=socket.gethostname()))
@@ -97,19 +104,65 @@ class TUClient:
         self._stopped = False
         self._last_collect_second = 0
         self._collect_time_decimal = 0.5  # we always collect at the middle of a second
+        self._last_received_ts = 0        # ts when we received last feedback from TUGateway, used for checking timeout.
+        # We use a global lock. This is by far only needed by test cases, which a different thread
+        # calls our public functions.
+        self._lock = RLock()
+        # A buffer that is used to store incoming commands when we are waiting for something.
+        self._income_data_buffer = deque()
 
         # don't call protocol.connect() because start() may be called in a different process/thread
 
     def timestamp_and_send_list(self, data, ts=None):
-        # type: (List[Any], int) -> None
+        # type: (List[Any], float) -> None
         assert isinstance(data, list), 'Wrong data type for timestamp_and_send_list'
 
         # prefix it with the timestamp
         if not ts:
-            ts = int(time.time())
-        self._protocol.send_list([ts] + data)
+            ts = time.time()
+        with self._lock:
+            self._protocol.send_list([ts] + data)
+        time.sleep(0)
 
     def start(self):
+        while not self._stopped:
+            try:
+                self._start_session()
+                self._logger.info(f'Client node {self._node_name} session ended')
+            except TimeoutError as err:
+                self._logger.error(f'Client node {self._node_name} timeout error. ' + str(err))
+                with self._lock:
+                    self._protocol.disconnect()
+                self._logger.info(f'Client node {self._node_name} network protocol disconnected, trying reconnect...')
+            except Exception as err:
+                self._logger.error(f'Client node {self._node_name} fatal error: {type(err).__name__}: {str(err)}')
+                return
+
+    def _wait_for(self, reply, error_message):
+        """Wait for reply and record error_message if times out"""
+        # TODO: This is an ugly hack. We need to use a proper finite-state automaton and merge this with the main message loop.
+        with self._lock:
+            while True:
+                req = self._protocol.receive(self._network_timeout * 1000)
+                if req is not None and len(req) >= 1 and isinstance(req[0], str):
+                    if req[0] == reply:
+                        return
+                    elif req[0] == 'HB':
+                        continue
+                    elif req[0] == 'WRONGKEY':
+                        raise KeyError(error_message + ' Please check API secret key. Exiting...')
+                    elif req[0] == 'BADMSG':
+                        raise KeyError(error_message + ' Received BADMSG reply. Exiting...')
+                    elif req[0] == 'ACTION':
+                        # We put the ACTION command in a buffer and process it later
+                        self._logger.info(f'Received ACTION command while waiting for {reply}, postponing the ACTION command...')
+                        self._income_data_buffer.append(req)
+                    else:
+                        raise CommunicationError(error_message + f' (got reply {req})')
+                else:
+                    raise TimeoutError(error_message + ' (no reply received)')
+
+    def _start_session(self):
         if self._debugging_level >= 1:
             import cProfile
             import io
@@ -122,29 +175,40 @@ class TUClient:
 
         # ZMQ context must be created here because this function may be executed in a separate
         # process/thread
-        self._protocol.connect_to_gateway()
+        with self._lock:
+            self._protocol.connect_to_gateway()
+
+        # Handshake
+        self.timestamp_and_send_list(['KEY', self._api_secret_key, self._cluster_name, self._node_name])
+        self._wait_for('OK', 'Failed to register on a gateway.')
+        self._logger.info(f'Client node {self._node_name} authenticated with gateway.')
 
         # Send the PI and Parameter Metadata
         # Merge all PI names to one list
         pi_metadata = []
-        for getter in self._getters:
-            if getter.pi_names is not None:
-                assert isinstance(getter.pi_names, list)
-                pi_metadata += getter.pi_names
+        if self._getters is not None:
+            for getter in self._getters:
+                if getter.pi_names is not None:
+                    assert isinstance(getter.pi_names, list)
+                    pi_metadata += getter.pi_names
         # Merge all parameter names to one list
         param_metadata = []
-        for setter in self._setters:
-            if setter.parameter_names is not None:
-                assert isinstance(setter.parameter_names, list)
-                param_metadata += setter.parameter_names
+        if self._setters is not None:
+            for setter in self._setters:
+                if setter.parameter_names is not None:
+                    assert isinstance(setter.parameter_names, list)
+                    param_metadata += setter.parameter_names
 
-        self.timestamp_and_send_list([b'PIPMETA', pi_metadata, param_metadata])
+        self.timestamp_and_send_list(['PIPMETA', pi_metadata, param_metadata])
+        self._wait_for('OK', 'Failed to register PI and parameter metadata.')
+        self._logger.info(f'Client node {self._node_name} registered PI and Parameter metadata.')
+        self._last_received_ts = time.time()
 
         # GC causes unplanned stall and disrupts precisely timed collection.
         # Disable it and do it manually before sleeping.
         gc.disable()
         try:
-            self._logger.info('TUClient started')
+            self._logger.info(f'Client node {self._node_name} started')
             while not self._stopped:
                 if self._getters is not None and len(self._getters) > 0:
                     ts = time.time()
@@ -152,11 +216,20 @@ class TUClient:
                         # This must be updated *before* collecting to prevent the send time from
                         # slowly drifting away
                         self._last_collect_second = int(ts)
-                        result = []
+                        pi_data = []
                         for g in self._getters:
-                            result.extend(g.collect())
-                        self._logger.info('Collected: ' + str(result))
-                        self.timestamp_and_send_list(result, ts)
+                            d = g.collect()
+                            if d is None or len(d) == 0:
+                                self._logger.warning(f'Client node {self._node_name} getter {g} doesn\'t return any data')
+                            else:
+                                pi_data.extend(d)
+                        if len(pi_data) == 0:
+                            self._logger.info(
+                                f'Client node {self._node_name} no getter returns data. Skipped sending.')
+                        else:
+                            self._logger.info(f'Client node {self._node_name} collected from all getters: ' + str(pi_data))
+                            self.timestamp_and_send_list(['PI', pi_data])
+                            # We don't wait for 'OK' to save time
                     else:
                         pass
                 else:
@@ -164,6 +237,7 @@ class TUClient:
 
                 gc.collect()
                 flush_log()
+                time.sleep(0)
 
                 # Print out memory usage every minute
                 if self._debugging_level >= 2 and int(time.time()) % 60 == 0:
@@ -174,20 +248,47 @@ class TUClient:
                 sleep_second = self._last_collect_second + self._collect_time_decimal + self._tick_len - time.time()
                 sleep_second = max(sleep_second, 0)
 
-                sleep_start_ts = time.time()
-                req = self._protocol.receive(sleep_second * 1000)
-                self._logger.debug('Slept {0} seconds'.format(time.time() - sleep_start_ts))
+                if len(self._income_data_buffer) != 0:
+                    req = self._income_data_buffer.popleft()
+                    self._logger.info(f'Processing the postponed {req[0]} command...')
+                else:
+                    sleep_start_ts = time.time()
+                    with self._lock:
+                        req = self._protocol.receive(sleep_second * 1000)
+                    self._logger.debug('Slept {0} seconds'.format(time.time() - sleep_start_ts))
                 if req:
-                    cmd = req[2]
-                    if req[0] == b'ACTION':
-                        actions = req[1:]
+                    self._last_received_ts = time.time()
+                    cmd = req[0]
+                    if cmd == 'ACTION':
+                        actions = req[1]
                         self._logger.info('Performing action ' + str(actions))
-                        for c in self._setter:
+                        for c in self._setters:
                             c.action(actions)
+                        self._logger.info('Finished performing action.')
+                        self.timestamp_and_send_list(['ACTIONDONE'])
+                    elif cmd == 'OK' or cmd == 'HB':
+                        pass
+                    elif cmd == 'DATALENWRONG':
+                        self._logger.error(f'Client node {self._node_name} received data length wrong error. Exiting.')
+                        self.stop()
+                    elif cmd == 'NOTAUTH':
+                        self._logger.error(f'Client node {self._node_name} not authenticated. Try reconnecting...')
+                        return
+                    elif cmd == 'BADPIDATA':
+                        self._logger.error(f'Client node {self._node_name} received bad PI data error. Exiting.')
+                        self.stop()
+                    elif cmd == 'DUPLICATEDPIDATA':
+                        self._logger.error(f'Client node {self._node_name} received duplicate PI data error.')
                     else:
                         self._logger.warning('Unknown command received: ' + cmd)
 
-            self._logger.info('TUClient stopped')
+                # Check timeout
+                if time.time() - self._last_received_ts > self._network_timeout:
+                    self._logger.warning(f'Client node {self._node_name} received no response for more than {self._network_timeout} seconds. Reconnecting...')
+                    return
+
+            self.timestamp_and_send_list(['CLIENTSTOP'])
+            self._logger.info(f'Client node {self._node_name} stopped')
         finally:
             gc.enable()
 

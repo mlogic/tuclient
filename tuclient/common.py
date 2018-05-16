@@ -22,6 +22,16 @@ __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
+from enum import Enum
+
+
+class ClusterStatus(Enum):
+    OFFLINE = 0
+    ALL_OK = 1
+    NOT_SETUP = 2      # This cluster hasn't been set up yet (desired cluster info not set).
+    NODES_MISMATCH = 3
+    NODES_LOST = 4
+
 
 def overrides(interface_class):
     def overrider(method):

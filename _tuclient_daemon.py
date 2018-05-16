@@ -67,8 +67,9 @@ if __name__ == '__main__':
 
     # ID
     client_id = uuid1()
-    node_name = config.node_name()
     cluster_name = config.cluster_name()
+    node_name = config.node_name()
+    api_secret_key = config.api_secret_key()
 
     # Protocol
     protocol_name = config.protocol()
@@ -92,8 +93,8 @@ if __name__ == '__main__':
     if 'tick_len' in config.get_config():
         tuclient_kwargs['tick_len'] = config.tick_len()
 
-    client = TUClient(logger, client_id, cluster_name=cluster_name, node_name=node_name, protocol=protocol,
-                      getters=[getter], setters=[setter], **tuclient_kwargs)
+    client = TUClient(logger, client_id, cluster_name=cluster_name, node_name=node_name, api_secret_key=api_secret_key,
+                      protocol=protocol, getters=[getter], setters=[setter], **tuclient_kwargs)
 
     pidfile_name = config.pidfile()
     pidfile = PIDLockFile(pidfile_name, timeout=-1)

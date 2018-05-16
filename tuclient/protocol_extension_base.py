@@ -70,6 +70,7 @@ class ProtocolExtensionBase(object):
     @abc.abstractmethod
     def send_list(self, data):
         # type: (List[Any]) -> None
-        """Send a list of floats
-        :param data : a list of floats"""
+        """Send a list
+
+        :param data : a list that can be JSON dumped"""
         pass

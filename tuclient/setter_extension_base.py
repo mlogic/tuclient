@@ -31,7 +31,7 @@ class SetterExtensionBase(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, logger, config):
-        # type: (logging.Logger, ConfigBase) -> None
+        # type: (logging.Logger, Optional[ConfigBase]) -> None
         self._logger = logger
         self._config = config
 

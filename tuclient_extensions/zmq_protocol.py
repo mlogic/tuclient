@@ -22,9 +22,11 @@ __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
+import json
 import logging
 from tuclient import *
 from uuid import *
+import zlib
 import zmq
 
 
@@ -38,7 +40,6 @@ class ZMQProtocol(ProtocolExtensionBase):
         self._context = None  # type: Optional[zmq.Context]
         self._socket = None   # type: Optional[zmq.Socket]
         self._poller = None   # type: Optional[zmq.Poller]
-        self._heartbeat_ts = None  # type: Optional[int]
 
     @overrides(ProtocolExtensionBase)
     def connect_to_gateway(self):
@@ -58,8 +59,6 @@ class ZMQProtocol(ProtocolExtensionBase):
         self._poller = zmq.Poller()
         self._poller.register(self._socket, zmq.POLLIN)
 
-        self._heartbeat_ts = time.time()
-
     @property
     @overrides(ProtocolExtensionBase)
     def connected(self):
@@ -69,14 +68,15 @@ class ZMQProtocol(ProtocolExtensionBase):
 
     @overrides(ProtocolExtensionBase)
     def disconnect(self):
-        if self._poller:
-            if self._socket:
+        if self._poller is not None:
+            if self._socket is not None:
                 self._poller.unregister(self._socket)
             self._poller = None
-        if self._socket:
+        if self._socket is not None:
             self._socket.close()
             self._socket = None
-        if self._context:
+        if self._context is not None:
+            self._context.destroy()
             self._context = None
 
     @overrides(ProtocolExtensionBase)
@@ -84,32 +84,28 @@ class ZMQProtocol(ProtocolExtensionBase):
         # type: (int) -> Optional[List[Any]]
         """Block until data arrives
         :param timeout: timeout in how many ms
-        :return: received request or None if timeout or heartbeat is received"""
-        p = dict(self._poller.poll(timeout))
-        if self._socket in p:
-            req = pickle.loads(zlib.decompress(self._socket.recv()))
-            assert req[0] == ZMQProtocol.PROTOCOL_VER,\
-                'Protocol version error. Expecting {exp}, got {act}'.format(exp=ZMQProtocol.PROTOCOL_VER, act=req[0])
-            if isinstance(req[2], bytes):
-                # Update heartbeat after receiving any command
-                self._heartbeat_ts = time.time()
-                cmd = req[2]
-                if cmd == b'HB':
-                    self._logger.debug('Received heartbeat')
-                else:
+        :return: received request or None if timeout"""
+        start_time = time.time()
+        while True:
+            time_left = timeout - (time.time() - start_time) * 1000
+            if time_left < 0:
+                return None
+            p = dict(self._poller.poll(time_left))
+            if self._socket in p:
+                try:
+                    data = self._socket.recv()
+                    req = json.loads(zlib.decompress(data))
+                except (zlib.error, json.decoder.JSONDecodeError) as err:
+                    self._logger.error(f'Failed decoding a message with error {err}: ' + str(data))
+                    continue
+
+                if req[0] != ZMQProtocol.PROTOCOL_VER:
+                    self._logger.error('Protocol version error. Expecting {exp}, got {act}'.format(exp=ZMQProtocol.PROTOCOL_VER, act=req[0]))
+                    continue
+                if isinstance(req[2], str):
                     return req[2:]
-            else:
-                self._logger.error('Corrupted message received: ' + req)
-        else:
-            if time.time() - self._heartbeat_ts > 5:
-                self._logger.warning('No heartbeat for 5 seconds')
-                # TODO: Do we need to do something like the following to reconnect here?
-                # self.disconnect()
-                # self.connect_to_gateway()
-                #
-                # self._logger.warning('Connection timeout, reconnected')
-                self._heartbeat_ts = time.time()
-        return None
+                else:
+                    self._logger.error('Corrupted message received: ' + str(req))
 
     @overrides(ProtocolExtensionBase)
     def send_list(self, data):
@@ -121,5 +117,5 @@ class ZMQProtocol(ProtocolExtensionBase):
 
         if not self.connected:
             self.connect_to_gateway()
-        self._socket.send(zlib.compress(pickle.dumps(data)))
+        self._socket.send(zlib.compress(json.dumps(data).encode('ascii')))
         self._logger.debug('Message sent at {ts}'.format(ts=time.time()))
