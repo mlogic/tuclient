@@ -1,1 +1,5 @@
+*.tar.gz
 .mypy_cache
+mock-result-dir
+rpm-build-dir
+tuclient-*.*.*

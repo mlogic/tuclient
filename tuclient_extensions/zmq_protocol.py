@@ -35,7 +35,7 @@ class ZMQProtocol(ProtocolExtensionBase):
 
     def __init__(self, logger, client_id, gateway_address):
         # type: (logging.Logger, UUID, str) -> None
-        super().__init__(logger, client_id)
+        super(ZMQProtocol, self).__init__(logger, client_id)
         self._gateway_address = gateway_address
         self._context = None  # type: Optional[zmq.Context]
         self._socket = None   # type: Optional[zmq.Socket]

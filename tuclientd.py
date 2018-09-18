@@ -77,6 +77,7 @@ if __name__ == '__main__':
         protocol = ZMQProtocol(logger, client_id, config.gateway_address())
     else:
         raise ValueError('Unsupported protocol ' + protocol_name)
+    network_timeout = config.network_timeout()
 
     # Setter module
     setter_module = importlib.import_module(config.setter_module())
@@ -94,7 +95,8 @@ if __name__ == '__main__':
         tuclient_kwargs['tick_len'] = config.tick_len()
 
     client = TUClient(logger, client_id, cluster_name=cluster_name, node_name=node_name, api_secret_key=api_secret_key,
-                      protocol=protocol, getters=[getter], setters=[setter], **tuclient_kwargs)
+                      protocol=protocol, getters=[getter], setters=[setter], network_timeout=network_timeout,
+                      **tuclient_kwargs)
 
     pidfile_name = config.pidfile()
     pidfile = PIDLockFile(pidfile_name, timeout=-1)

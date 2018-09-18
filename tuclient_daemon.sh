@@ -53,7 +53,7 @@ if [ -z "$PIDFILE" ]; then
 fi
 
 if [ "$CMD" = "start" ]; then
-    python _tuclient_daemon.py "${ARGS[@]}"
+    python tuclientd.py "${ARGS[@]}"
 elif [ "$CMD" = "stop" ]; then
     if [ ! -e $PIDFILE ]; then
         echo "$PIDFILE doesn't exist. Can't find the running process."

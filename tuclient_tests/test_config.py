@@ -60,7 +60,7 @@ class TestConfig(unittest.TestCase):
     def test_empty_config_file(self):
         config = ConfigFile(None, 'gateway', None, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file_empty.ini', ))
         # Default values from tuclient/default_conf_file.ini should be used here
-        self.assertEqual('/var/log/tu/log', config.log_file())
+        self.assertEqual('/var/log/tuneup.ai/tuclient.log', config.log_file())
         self.assertEqual(logging.WARNING, config.logging_level())
 
 

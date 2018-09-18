@@ -50,7 +50,7 @@ class ConfigFile(ConfigBase):
         :param system_type: the type of the system to read configuration for
         :param host_name: the host name of the system
         """
-        super().__init__(logger, system_type, host_name)
+        super(ConfigFile, self).__init__(logger, system_type, host_name)
         # Parent's init should've loaded the default values in.
         cp = ConfigParser(defaults=self._config)
         self.log(logging.INFO, 'Loaded config files: ' + str(cp.read(*args)))

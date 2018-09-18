@@ -30,12 +30,14 @@ $TUCLIENT_SERVICE_CMD start
 sleep 3
 $TUCLIENT_SERVICE_CMD status &>$TMPFILE
 grep -q "is running as" $TMPFILE
-grep -q "Collected: \[1, 2\]" /tmp/test_tuclient_log.txt
+# Testing collection is commented out for now, because a client doesn't collect
+# until it connects to a gateway.
+#grep -q "Collected: \[1, 2\]" /tmp/test_tuclient_log.txt
 
 trap "" EXIT
 $TUCLIENT_SERVICE_CMD stop
 sleep 2
-grep -q "TUClient stopped" /tmp/test_tuclient_log.txt
+grep -q "Client node .* stopped" /tmp/test_tuclient_log.txt
 $TUCLIENT_SERVICE_CMD status &>$TMPFILE
 grep -q "not running" $TMPFILE
 

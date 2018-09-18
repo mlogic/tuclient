@@ -32,6 +32,17 @@ from .tulogging import get_file_logger
 class ConfigBase(object):
     __metaclass__ = abc.ABCMeta
 
+    NAME_TO_LEVEL = {
+        'CRITICAL': logging.CRITICAL,
+        'FATAL': logging.FATAL,
+        'ERROR': logging.ERROR,
+        'WARN': logging.WARNING,
+        'WARNING': logging.WARNING,
+        'INFO': logging.INFO,
+        'DEBUG': logging.DEBUG,
+        'NOTSET': logging.NOTSET,
+    }
+
     def __init__(self, logger=None, system_type=None, host_name=None):
         # type: (Optional[logging.Logger], Optional[str], Optional[str]) -> None
         """Initialize a ConfigBase object
@@ -149,7 +160,7 @@ class ConfigBase(object):
         :return: logging level
         """
         levelstr = self.get_config()['logging_level'].upper()
-        return logging._nameToLevel[levelstr]
+        return ConfigBase.NAME_TO_LEVEL[levelstr]
 
     def log(self, level, message, *args, **kwargs):
         # type: (int, str, *Any, **Any) -> None
@@ -188,4 +199,10 @@ class ConfigBase(object):
         # type: () -> int
         """Get the duration of a tick in seconds
         :return tick length in sections"""
-        return self.get_config()['tick_len']
+        return int(self.get_config()['tick_len'])
+
+    def network_timeout(self):
+        # type: () -> int
+        """Get the network timeout in seconds
+        :return network timeout in sections"""
+        return int(self.get_config()['network_timeout'])

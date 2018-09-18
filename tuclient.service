@@ -1,0 +1,14 @@
+[Unit]
+Description=TuneUp.ai Client Daemon
+After=systemd-sysctl.service network.target
+Requires=polkit.service
+Conflicts=cpupower.service tuned.service
+Documentation=man:tuclient(8)
+
+[Service]
+Type=simple
+PIDFile=/run/tuclient/tuclient.pid
+ExecStart=/usr/sbin/tuclient
+
+[Install]
+WantedBy=multi-user.target

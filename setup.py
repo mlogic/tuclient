@@ -30,6 +30,7 @@ setup(name='tuclient',
       version='0.1',
       packages=[],
       setup_requires=[
+          'enum',
           'pyzmq',
           'python-daemon',
           'Sphinx',
