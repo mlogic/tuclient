@@ -19,8 +19,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import argparse
 import daemon
-import importlib.util
+from daemon.pidfile import TimeoutPIDLockFile
+import importlib
 from lockfile.pidlockfile import PIDLockFile
+import glob
 import os
 import signal
 import socket
@@ -56,13 +58,20 @@ def stop(signum, frame):
 
 
 if __name__ == '__main__':
+    etc_dir = '/etc/tuclient'
     parser = argparse.ArgumentParser(description='TuneUp.ai Client daemon')
     parser.add_argument('-c', '--conf', metavar='CONF_FILE', type=str, nargs=1,
-                        help='Configuration file.')
+                        help='Configuration file (default to *.conf files in {etc_dir} in alphabetical order)'.format(
+                            etc_dir=etc_dir))
     parser.add_argument('-p', '--pidfile', metavar='PIDFILE', type=str, nargs=1,
-                        help='PID file name')
+                        help='Override PID file name from the configuration file')
     args = parser.parse_args()
-    config = ConfigFile(None, 'client', socket.gethostname(), args.conf)
+    if args.conf is None:
+        conffiles = [f for f in glob.glob(os.path.join(etc_dir, '*.conf')) if os.path.isfile(f)]
+        conffiles.sort()
+    else:
+        conffiles = args.conf
+    config = ConfigFile(None, 'client', socket.gethostname(), *conffiles)
     logger = config.get_logger()
 
     # ID
@@ -98,8 +107,10 @@ if __name__ == '__main__':
                       protocol=protocol, getters=[getter], setters=[setter], network_timeout=network_timeout,
                       **tuclient_kwargs)
 
-    pidfile_name = config.pidfile()
-    pidfile = PIDLockFile(pidfile_name, timeout=-1)
+    pidfile_name = args.pidfile if args.pidfile is not None else config.pidfile()
+    # PIDLockFile(pidfile_name, timeout=-1) doesn't work for Python 2. We
+    # have to use the following:
+    pidfile = TimeoutPIDLockFile(pidfile_name, acquire_timeout=-1)
     check_stale_lock(pidfile)
     daemon_output_dir = config.daemon_output_dir()
     context = daemon.DaemonContext(

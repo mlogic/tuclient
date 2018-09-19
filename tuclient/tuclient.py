@@ -73,6 +73,14 @@ class CommunicationError(Exception):
     pass
 
 
+# Python 2 doesn't have a builtin TimeoutError
+if 'TimeoutError' not in dir():
+    class TimeoutError(OSError):
+        """ Timeout expired. """
+        def __init__(self, *args, **kwargs): # real signature unknown
+            pass
+
+
 class TUClient:
     """The TuneUp.ai Client Class"""
 

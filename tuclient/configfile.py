@@ -34,8 +34,8 @@ from .common import *
 
 
 class ConfigFile(ConfigBase):
-    def __init__(self, logger, system_type, host_name, *args):
-        # type: (Optional[logging.Logger], Optional[str], Optional[str], *Any) -> None
+    def __init__(self, logger, system_type, host_name, *filenames):
+        # type: (Optional[logging.Logger], Optional[str], Optional[str], *str) -> None
         """Load a configuration file
 
         If a system_type is supplied, such as "gateway", "client", or "engine",
@@ -53,7 +53,7 @@ class ConfigFile(ConfigBase):
         super(ConfigFile, self).__init__(logger, system_type, host_name)
         # Parent's init should've loaded the default values in.
         cp = ConfigParser(defaults=self._config)
-        self.log(logging.INFO, 'Loaded config files: ' + str(cp.read(*args)))
+        self.log(logging.INFO, 'Loaded config files: ' + str(cp.read(filenames)))
         # We use the [system_type] section in our config file to overwrite the default values.
         self._config = cp
         if system_type:

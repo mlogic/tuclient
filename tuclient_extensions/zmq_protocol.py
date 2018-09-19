@@ -22,6 +22,7 @@ __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
+import errno
 import json
 import logging
 from tuclient import *
@@ -90,13 +91,24 @@ class ZMQProtocol(ProtocolExtensionBase):
             time_left = timeout - (time.time() - start_time) * 1000
             if time_left < 0:
                 return None
-            p = dict(self._poller.poll(time_left))
+            try:
+                p = dict(self._poller.poll(time_left))
+            except zmq.ZMQError as e:
+                # This is a quirk of older zmq. The old version of pyzmq from EPEL throws out ZMQError
+                # when receiving a signal; the latest version of pyzmq doesn't.
+                if e.errno == errno.EINTR:
+                    # poll again
+                    continue
+                else:
+                    # other error, raise it
+                    raise
             if self._socket in p:
                 try:
                     data = self._socket.recv()
                     req = json.loads(zlib.decompress(data))
                 except (zlib.error, json.decoder.JSONDecodeError) as err:
-                    self._logger.error(f'Failed decoding a message with error {err}: ' + str(data))
+                    self._logger.error('Failed decoding a message with error {err}: {data}'.format(
+                        err=err, data=str(data)))
                     continue
 
                 if req[0] != ZMQProtocol.PROTOCOL_VER:

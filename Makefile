@@ -71,7 +71,8 @@ srpm: archive rpm-build-dir
 
 rpm: archive rpm-build-dir
 	rpmbuild --define "_sourcedir `pwd`/rpm-build-dir" --define "_srcrpmdir `pwd`/rpm-build-dir" \
-		--define "_specdir `pwd`/rpm-build-dir" --nodeps $(RPM_ARGS) -tb $(VERSIONED_NAME).tar.gz
+		--define "_specdir `pwd`/rpm-build-dir" --define "_rpmdir `pwd`/rpm-build-dir" \
+		--nodeps $(RPM_ARGS) -tb $(VERSIONED_NAME).tar.gz
 
 clean-mock-result-dir:
 	rm -f mock-result-dir/*
@@ -99,6 +100,9 @@ install-dirs:
 install: install-dirs
 	# library
 	cp -a tuclient $(DESTDIR)$(PYTHON_SITELIB)
+	cp -a tuclient_extensions $(DESTDIR)$(PYTHON_SITELIB)
+	# drop tuclient_tests when we reach 1.0
+	cp -a tuclient_tests $(DESTDIR)$(PYTHON_SITELIB)
 
 	# binaries
 	$(call install_python_script,tuclientd.py,$(DESTDIR)/usr/sbin/tuclientd)

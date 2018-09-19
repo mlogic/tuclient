@@ -116,8 +116,12 @@ fi
 %doc %{docdir}
 %if %{with python3}
 %{python3_sitelib}/tuclient
+%{python3_sitelib}/tuclient_extensions
+%{python3_sitelib}/tuclient_tests
 %else
 %{python2_sitelib}/tuclient
+%{python2_sitelib}/tuclient_extensions
+%{python2_sitelib}/tuclient_tests
 %endif
 %{_sbindir}/tuclientd
 %dir %{_sysconfdir}/tuclient
