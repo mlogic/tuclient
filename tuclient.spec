@@ -59,7 +59,7 @@ Requires: %{_py}-daemon, %{_py}-zmq, %{_py}-enum, %{_py}-typing
 %if %{with python3}
 Requires: python3-dbus, python3-gobject-base
 %else
-Requires: dbus-python, pygobject3-base, python-configparser
+Requires: dbus-python, pygobject3-base, python-configparser, python-monotonic
 %endif
 Requires: virt-what, ethtool, gawk, hdparm
 Requires: util-linux, dbus, polkit

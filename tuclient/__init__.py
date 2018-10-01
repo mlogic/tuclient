@@ -25,7 +25,7 @@ from .common import *
 from .configbase import ConfigBase
 from .configfile import ConfigFile
 from .getter_extension_base import GetterExtensionBase
-from .protocol_extension_base import ProtocolExtensionBase
+from .protocol_extension_base import *
 from .setter_extension_base import SetterExtensionBase
 from .tulogging import *
 from .tuclient import *

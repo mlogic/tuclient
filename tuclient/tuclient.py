@@ -56,12 +56,17 @@ __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
-from collections import deque
+from .common import *
 import gc
 from .getter_extension_base import GetterExtensionBase
-from .protocol_extension_base import ProtocolExtensionBase
+from .protocol_extension_base import *
 from .setter_extension_base import SetterExtensionBase
 import socket
+# This file has to be Python 2/3 compatible
+try:
+    from queue import Empty, Queue
+except ImportError:
+    from Queue import Empty, Queue
 from threading import RLock
 import time
 import traceback
@@ -69,21 +74,22 @@ from .tulogging import *
 from uuid import *
 
 
-class CommunicationError(Exception):
-    pass
-
-
-# Python 2 doesn't have a builtin TimeoutError
-if 'TimeoutError' not in dir():
-    class TimeoutError(OSError):
-        """ Timeout expired. """
-        def __init__(self, *args, **kwargs): # real signature unknown
-            pass
+class ProtocolCode(IntEnum):
+    HEARTBEAT = 1
+    OK = 2
+    # Request status report from the client
+    STATUS = 3
+    ACTION = 4
+    # Reply from the client for the STATUS request
+    STATUS_REPLY = 5
+    KEY = 10
+    PI_PARAMETER_META = 11
+    WRONG_KEY = 20
+    BAD_MSG = 21
 
 
 class TUClient:
     """The TuneUp.ai Client Class"""
-
     def __init__(self, logger, client_id, cluster_name, node_name, api_secret_key, protocol, getters, setters, network_timeout, tick_len=1, debugging_level=0):
         # type: (logging.Logger, UUID, str, str, str, ProtocolExtensionBase, Optional[List[GetterExtensionBase]], Optional[List[SetterExtensionBase]], int, int, int) -> None
         """ Create a TUClient instance
@@ -101,7 +107,9 @@ class TUClient:
         self._cluster_name = cluster_name
         self._node_name = node_name
         self._api_secret_key = api_secret_key
+        self._msg_queue = Queue()
         self._protocol = protocol
+        self._protocol.set_target_queue(self._msg_queue)
         self._network_timeout = network_timeout
         self._debugging_level = debugging_level
         self._logger.info('Client {name} on {hostname} has been created'.format(name=self._node_name,
@@ -111,14 +119,13 @@ class TUClient:
         self._tick_len = tick_len
         self._setters = setters
         self._stopped = False
-        self._last_collect_second = 0
+        self._last_collect_time = 0
         self._collect_time_decimal = 0.5  # we always collect at the middle of a second
         self._last_received_ts = 0        # ts when we received last feedback from TUGateway, used for checking timeout.
         # We use a global lock. This is by far only needed by test cases, which a different thread
         # calls our public functions.
         self._lock = RLock()
-        # A buffer that is used to store incoming commands when we are waiting for something.
-        self._income_data_buffer = deque()
+        self._status = ClientStatus.OFFLINE
 
         # don't call protocol.connect() because start() may be called in a different process/thread
 
@@ -129,53 +136,32 @@ class TUClient:
         # prefix it with the timestamp
         if not ts:
             ts = time.time()
-        with self._lock:
-            self._protocol.send_list([ts] + data)
+        self._protocol.send_list([ts] + data)
+        # Force a context switch
         time.sleep(0)
 
     def start(self):
-        while not self._stopped:
-            try:
-                self._start_session()
-                self._logger.info('Client node {node_name} session ended'.format(node_name=self._node_name))
-            except TimeoutError as err:
-                self._logger.error('Client node {node_name} timeout error: {err}'.format(node_name=self._node_name,
-                                                                                         err=str(err)))
-                with self._lock:
-                    self._protocol.disconnect()
-                self._logger.info('Client node {node_name} network protocol disconnected, trying reconnect...'
-                                  .format(node_name=self._node_name))
-            except Exception as err:
-                self._logger.error('Client node {node_name} fatal error: {err_name}: {err}'
-                                   .format(node_name=self._node_name, err_name=type(err).__name__, err=str(err)))
-                self._logger.error(traceback.format_exc())
-                return
+        try:
+            while not self._stopped:
+                try:
+                    self._protocol.start_poller()
+                    self._start_session()
+                    self._logger.info('Client node {node_name} session ended'.format(node_name=self._node_name))
+                except TUTimeoutError as err:
+                    self._logger.error('Client node {node_name} timeout error: {err}'.format(node_name=self._node_name,
+                                                                                             err=str(err)))
+                    with self._lock:
+                        self._protocol.disconnect()
+                    self._logger.info('Client node {node_name} network protocol disconnected, trying reconnect...'
+                                      .format(node_name=self._node_name))
+                except Exception as err:
+                    self._logger.error('Client node {node_name} fatal error: {err_name}: {err}'
+                                       .format(node_name=self._node_name, err_name=type(err).__name__, err=str(err)))
+                    self._logger.error(traceback.format_exc())
+                    return
+        finally:
+            self._protocol.disconnect()
         self._logger.info('Client node {node_name} stopped'.format(node_name=self._node_name))
-
-
-    def _wait_for(self, reply, error_message):
-        """Wait for reply and record error_message if times out"""
-        # TODO: This is an ugly hack. We need to use a proper finite-state automaton and merge this with the main message loop.
-        with self._lock:
-            while True:
-                req = self._protocol.receive(self._network_timeout * 1000)
-                if req is not None and len(req) >= 1 and isinstance(req[0], str):
-                    if req[0] == reply:
-                        return
-                    elif req[0] == 'HB':
-                        continue
-                    elif req[0] == 'WRONGKEY':
-                        raise KeyError(error_message + ' Please check API secret key. Exiting...')
-                    elif req[0] == 'BADMSG':
-                        raise KeyError(error_message + ' Received BADMSG reply. Exiting...')
-                    elif req[0] == 'ACTION':
-                        # We put the ACTION command in a buffer and process it later
-                        self._logger.info('Received ACTION command while waiting for {reply}, postponing the ACTION command...'.format(reply=reply))
-                        self._income_data_buffer.append(req)
-                    else:
-                        raise CommunicationError(error_message + ' (got reply {req})'.format(req=req))
-                else:
-                    raise TimeoutError(error_message + ' (no reply received)')
 
     def _start_session(self):
         if self._debugging_level >= 1:
@@ -188,71 +174,52 @@ class TUClient:
             from pympler.tracker import SummaryTracker
             tracker = SummaryTracker()
 
-        # ZMQ context must be created here because this function may be executed in a separate
-        # process/thread
-        with self._lock:
-            self._protocol.connect_to_gateway()
-
-        # Handshake
-        self.timestamp_and_send_list(['KEY', self._api_secret_key, self._cluster_name, self._node_name])
-        self._wait_for('OK', 'Failed to register on a gateway.')
-        self._logger.info('Client node {node_name} authenticated with gateway.'.format(node_name=self._node_name))
-
-        # Send the PI and Parameter Metadata
-        # Merge all PI names to one list
-        pi_metadata = []
-        if self._getters is not None:
-            for getter in self._getters:
-                if getter.pi_names is not None:
-                    assert isinstance(getter.pi_names, list)
-                    pi_metadata += getter.pi_names
-        # Merge all parameter names to one list
-        param_metadata = []
-        if self._setters is not None:
-            for setter in self._setters:
-                if setter.parameter_names is not None:
-                    assert isinstance(setter.parameter_names, list)
-                    param_metadata += setter.parameter_names
-
-        self.timestamp_and_send_list(['PIPMETA', pi_metadata, param_metadata])
-        self._wait_for('OK', 'Failed to register PI and parameter metadata.')
-        self._logger.info('Client node {node_name} registered PI and Parameter metadata.'.format(node_name=self._node_name))
-        self._last_received_ts = time.time()
-
         # GC causes unplanned stall and disrupts precisely timed collection.
         # Disable it and do it manually before sleeping.
         gc.disable()
+        timeout_start = None
+        current_error_msg = None
         try:
             self._logger.info('Client node {node_name} started'.format(node_name=self._node_name))
             while not self._stopped:
-                if self._getters is not None and len(self._getters) > 0:
-                    ts = time.time()
-                    if ts - (self._last_collect_second + self._collect_time_decimal) >= self._tick_len - 0.01:
-                        # This must be updated *before* collecting to prevent the send time from
-                        # slowly drifting away
-                        self._last_collect_second = int(ts)
-                        pi_data = []
-                        for g in self._getters:
-                            d = g.collect()
-                            if d is None or len(d) == 0:
-                                self._logger.warning('Client node {node_name} getter {g} did not return any data'.format(
-                                    node_name=self._node_name, g=g
-                                ))
+                if self._status == ClientStatus.OFFLINE:
+                    self._status = ClientStatus.HANDSHAKE1_AUTHENTICATING
+                    # Handshake
+                    self.timestamp_and_send_list(
+                        [ProtocolCode.KEY, self._api_secret_key, self._cluster_name, self._node_name])
+                    timeout_start = monotonic_time()
+                    current_error_msg = 'Failed to connect to the gateway'
+                    self._logger.info('Client node {node_name} initiated handshaking. Step 1: authenticating...'.format(node_name=self._node_name))
+
+                if self._status == ClientStatus.ALL_OK:
+                    if self._getters is not None and len(self._getters) > 0:
+                        ts = monotonic_time()
+                        if ts - (self._last_collect_time + self._collect_time_decimal) >= self._tick_len - 0.01:
+                            # This must be updated *before* collecting to prevent the send time from
+                            # slowly drifting away
+                            self._last_collect_time = int(ts)
+                            pi_data = []
+                            for g in self._getters:
+                                d = g.collect()
+                                if d is None or len(d) == 0:
+                                    self._logger.warning('Client node {node_name} getter {g} did not return any data'.format(
+                                        node_name=self._node_name, g=g
+                                    ))
+                                else:
+                                    pi_data.extend(d)
+                            if len(pi_data) == 0:
+                                self._logger.info(
+                                    'Client node {node_name} no getter returns data. Skipped sending.'.format(
+                                        node_name=self._node_name))
                             else:
-                                pi_data.extend(d)
-                        if len(pi_data) == 0:
-                            self._logger.info(
-                                'Client node {node_name} no getter returns data. Skipped sending.'.format(
-                                    node_name=self._node_name))
+                                self._logger.info('Client node {node_name} collected from all getters: {pi_data}'
+                                                  .format(node_name=self._node_name, pi_data=str(pi_data)))
+                                self.timestamp_and_send_list(['PI', pi_data])
+                                # We don't wait for 'OK' to save time
                         else:
-                            self._logger.info('Client node {node_name} collected from all getters: {pi_data}'
-                                              .format(node_name=self._node_name, pi_data=str(pi_data)))
-                            self.timestamp_and_send_list(['PI', pi_data])
-                            # We don't wait for 'OK' to save time
+                            pass
                     else:
-                        pass
-                else:
-                    self._last_collect_second = time.time()
+                        self._last_collect_time = monotonic_time()
 
                 gc.collect()
                 flush_log()
@@ -263,54 +230,116 @@ class TUClient:
                     print('Time: ' + time.asctime(time.localtime(time.time())))
                     tracker.print_diff()
 
-                # Calculate the precise time for next collection
-                sleep_second = self._last_collect_second + self._collect_time_decimal + self._tick_len - time.time()
-                sleep_second = max(sleep_second, 0)
-
-                if len(self._income_data_buffer) != 0:
-                    req = self._income_data_buffer.popleft()
-                    self._logger.info('Processing the postponed {cmd} command...'.format(cmd=req[0]))
+                if self._status == ClientStatus.ALL_OK and self._getters is not None and len(self._getters) > 0:
+                    # Calculate the precise time for next collection
+                    sleep_second = self._last_collect_time + self._collect_time_decimal + self._tick_len\
+                                   - monotonic_time()
+                    sleep_second = max(sleep_second, 0)
                 else:
-                    sleep_start_ts = time.time()
-                    with self._lock:
-                        req = self._protocol.receive(sleep_second * 1000)
-                    self._logger.debug('Slept {0} seconds'.format(time.time() - sleep_start_ts))
-                if req:
-                    self._last_received_ts = time.time()
-                    cmd = req[0]
-                    if cmd == 'ACTION':
-                        actions = req[1]
-                        self._logger.info('Performing action ' + str(actions))
-                        for c in self._setters:
-                            c.action(actions)
-                        self._logger.info('Finished performing action.')
-                        self.timestamp_and_send_list(['ACTIONDONE'])
-                    elif cmd == 'OK' or cmd == 'HB':
-                        pass
-                    elif cmd == 'DATALENWRONG':
-                        self._logger.error('Client node {node_name} received data length wrong error. Exiting.'
-                                           .format(node_name=self._node_name))
-                        self.stop()
-                    elif cmd == 'NOTAUTH':
-                        self._logger.error('Client node {node_name} not authenticated. Try reconnecting...'
-                                           .format(node_name=self._node_name))
-                        return
-                    elif cmd == 'BADPIDATA':
-                        self._logger.error('Client node {node_name} received bad PI data error. Exiting.'
-                                           .format(node_name=self._node_name))
-                        self.stop()
-                    elif cmd == 'DUPLICATEDPIDATA':
-                        self._logger.error('Client node {node_name} received duplicate PI data error.'
-                                           .format(node_name=self._node_name))
-                    else:
-                        self._logger.warning('Unknown command received: ' + cmd)
+                    sleep_second = 1
 
-                # Check timeout
-                if time.time() - self._last_received_ts > self._network_timeout:
-                    self._logger.warning(
-                        'Client node {node_name} received no response for more than {timeout} seconds. Reconnecting...'
-                            .format(node_name=self._node_name, timeout=self._network_timeout))
+                sleep_start_ts = monotonic_time()
+                try:
+                    msg = self._msg_queue.get(block=True, timeout=sleep_second)
+                except Empty:
+                    if monotonic_time() - self._last_received_ts > self._network_timeout or \
+                            (timeout_start is not None and monotonic_time() - timeout_start >= self._network_timeout):
+                        err_msg = 'Received no data in {timeout} seconds. Timeout. Reconnecting...'.\
+                            format(timeout=self._network_timeout)
+                        if current_error_msg is not None:
+                            err_msg = current_error_msg + ' ' + err_msg
+                        raise TUTimeoutError(err_msg)
+                    continue
+                self._logger.debug('Slept {0} seconds'.format(monotonic_time() - sleep_start_ts))
+                self._last_received_ts = monotonic_time()
+
+                # Remember to use 'continue' after successfully processing requests. Otherwise the default
+                # catch-all warning at the bottom will be triggered.
+                msg_code = msg[1]
+                if msg_code == ProtocolCode.HEARTBEAT:
+                    continue
+                elif msg_code == ProtocolCode.BAD_MSG:
+                    err_msg = 'Received BAD_MSG reply.'
+                    if len(msg) >= 3:
+                        err_msg = err_msg + ' ' + str(msg[2])
+                    if current_error_msg is not None:
+                        err_msg = current_error_msg + ' ' + err_msg
+                    raise TUCommunicationError(err_msg)
+                elif msg_code == ProtocolCode.WRONG_KEY:
+                    if self._status == ClientStatus.HANDSHAKE1_AUTHENTICATING:
+                        raise KeyError(current_error_msg + ' Please check API secret key. Exiting...')
+                    # For all other status, the default catch all warning below will be issued
+                elif msg_code == ProtocolCode.OK:
+                    if self._status == ClientStatus.HANDSHAKE1_AUTHENTICATING:
+                        self._status = ClientStatus.HANDSHAKE2_UPLOAD_METADATA
+                        self._logger.info(
+                            'Client node {node_name} authenticated with gateway.'.format(node_name=self._node_name))
+                        self._logger.info(
+                            'Client node {node_name} handshake step 2: uploading PI and parameter metadata.'.
+                            format(node_name=self._node_name))
+                        # Send the PI and Parameter Metadata
+                        # Merge all PI names to one list
+                        pi_metadata = []
+                        if self._getters is not None:
+                            for getter in self._getters:
+                                if getter.pi_names is not None:
+                                    assert isinstance(getter.pi_names, list)
+                                    pi_metadata += getter.pi_names
+                        # Merge all parameter names to one list
+                        param_metadata = []
+                        if self._setters is not None:
+                            for setter in self._setters:
+                                if setter.parameter_names is not None:
+                                    assert isinstance(setter.parameter_names, list)
+                                    param_metadata += setter.parameter_names
+
+                        self.timestamp_and_send_list([ProtocolCode.PI_PARAMETER_META, pi_metadata, param_metadata])
+                        timeout_start = monotonic_time()
+                        current_error_msg = 'Failed to register PI and parameter metadata.'
+                        continue
+                    elif self._status == ClientStatus.HANDSHAKE2_UPLOAD_METADATA:
+                        self._status = ClientStatus.ALL_OK
+                        self._logger.info(
+                            'Client node {node_name} registered PI and Parameter metadata.'.format(
+                                node_name=self._node_name))
+                        timeout_start = None
+                        current_error_msg = None
+                        continue
+                elif msg_code == ProtocolCode.ACTION:
+                    actions = msg[2]
+                    self._logger.info('Performing action ' + str(actions))
+                    for c in self._setters:
+                        c.action(actions)
+                    self._logger.info('Finished performing action.')
+                    self.timestamp_and_send_list(['ACTIONDONE'])
+                    continue
+                elif msg_code == ProtocolCode.STATUS:
+                    # The ID of the client or CLI tool that was requesting the status report
+                    requesting_client_id_in_hex_str = msg[2]
+                    self._protocol.status_reply(requesting_client_id_in_hex_str, self._status)
+                    continue
+                elif msg_code == 'DATALENWRONG':
+                    self._logger.error('Client node {node_name} received data length wrong error. Exiting.'
+                                       .format(node_name=self._node_name))
+                    self.stop()
+                    continue
+                elif msg_code == 'NOTAUTH':
+                    self._logger.error('Client node {node_name} not authenticated. Try reconnecting...'
+                                       .format(node_name=self._node_name))
                     return
+                elif msg_code == 'BADPIDATA':
+                    self._logger.error('Client node {node_name} received bad PI data error. Exiting.'
+                                       .format(node_name=self._node_name))
+                    self.stop()
+                    continue
+                elif msg_code == 'DUPLICATEDPIDATA':
+                    self._logger.error('Client node {node_name} received duplicate PI data error.'
+                                       .format(node_name=self._node_name))
+                    continue
+
+                # A cache all for all unexpected messages. Don't put this in an 'else', because that would prevent
+                # us from catch non-matching conditions from deeper ifs above.
+                self._logger.warning('Received unexpected message: ' + str(msg))
 
             self.timestamp_and_send_list(['CLIENTSTOP'])
             self._logger.info('Client node {node_name} stopped'.format(node_name=self._node_name))

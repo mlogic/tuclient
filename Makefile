@@ -50,6 +50,8 @@ install_python_script = $(call copy_executable,$(1),$(2)) \
 release-dir:
 	mkdir -p $(VERSIONED_NAME)
 
+# Manually making an archive instead of using git-archive makes it possible to package/test
+# code that hasn't been checked in.
 release-cp: release-dir
 	cp -a AUTHORS COPYING README.rst $(VERSIONED_NAME)
 
@@ -123,6 +125,7 @@ clean:
 test:
 	$(PYTHON) -m unittest discover tuclient_tests
 	tuclient_tests/test_tuclient_daemon.sh
+	tuclient_tests/test_lc.sh
 
 func-test: test
 

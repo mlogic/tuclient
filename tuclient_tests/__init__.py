@@ -20,3 +20,5 @@ __author__ = 'Yan Li'
 __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
+
+from .mock_tugateway import *

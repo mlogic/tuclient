@@ -22,15 +22,35 @@ __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
-from enum import Enum
+# Enum is not JSON serializable. IntEnum is.
+from enum import IntEnum
+# Python 2.7 doesn't have time.monotonic().
+import time
+try:
+    monotonic_time = time.monotonic
+except AttributeError:
+    # Use the monotonic module instead.
+    import monotonic
+    monotonic_time = monotonic.monotonic
 
 
-class ClusterStatus(Enum):
+class ClusterStatus(IntEnum):
     OFFLINE = 0
     ALL_OK = 1
     NOT_SETUP = 2      # This cluster hasn't been set up yet (desired cluster info not set).
     NODES_MISMATCH = 3
     NODES_LOST = 4
+
+
+class ClientStatus(IntEnum):
+    OFFLINE = 0
+    ALL_OK = 1
+    NOT_SETUP = 2
+    HANDSHAKE1_AUTHENTICATING = 3
+    HANDSHAKE2_UPLOAD_METADATA = 4
+    CONNECTION_ERROR = 5
+    GETTER_ERROR = 6
+    SETTER_ERROR = 7
 
 
 def overrides(interface_class):
