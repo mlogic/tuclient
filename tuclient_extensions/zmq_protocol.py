@@ -170,8 +170,8 @@ class ZMQProtocol(ProtocolExtensionBase):
                     self._target_queue.put(msg[1:3] + [client_id.hex])
                 elif msg[2] == ProtocolCode.STATUS_REPLY:
                     sending_to_client_id = UUID(hex=msg[3])
-                    client_status = msg[4]
-                    self._timestamp_and_send_list(self._cmd_socket, [client_status], sending_to_client_id)
+                    payload = msg[3:]
+                    self._timestamp_and_send_list(self._cmd_socket, payload, sending_to_client_id)
                 elif msg[2] == ZMQProtocolCmdCode.EXIT:
                     self._logger.info('Received exit command from {client_id}. Stopping poller loop...'.
                                       format(client_id=client_id))
@@ -321,13 +321,19 @@ class ZMQProtocol(ProtocolExtensionBase):
                 context.destroy()
 
     def status(self):
-        # type: () -> ClientStatus
+        # type: () -> Tuple[str, str, str, ClientStatus]
         msg = self._send_to_cmd_socket([ProtocolCode.STATUS], wait_for_reply=True)
-        return msg[1]
+        client_id_str = msg[1]
+        cluster_name = msg[2]
+        client_node_name = msg[3]
+        client_status = msg[4]
+        return client_id_str, cluster_name, client_node_name, client_status
 
-    def status_reply(self, client_id_in_hex_str, client_status):
-        # type: (str, ClientStatus) -> None
+    @overrides(ProtocolExtensionBase)
+    def status_reply(self, client_id_in_hex_str, cluster_name, node_name, client_status):
+        # type: (str, str, str, ClientStatus) -> None
         """Send a status reply to client_id
 
         tuclient calls this function to send back a reply to the STATUS request to the client with client_id."""
-        self._send_to_cmd_socket([ProtocolCode.STATUS_REPLY, client_id_in_hex_str, client_status], wait_for_reply=False)
+        self._send_to_cmd_socket([ProtocolCode.STATUS_REPLY, client_id_in_hex_str, cluster_name, node_name,
+                                  client_status], wait_for_reply=False)

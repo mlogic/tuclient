@@ -53,6 +53,18 @@ class ClientStatus(IntEnum):
     SETTER_ERROR = 7
 
 
+ClientStatusToStrMapping = {
+    ClientStatus.OFFLINE: 'Offline',
+    ClientStatus.ALL_OK: 'Running',
+    ClientStatus.NOT_SETUP: 'Not setup',
+    ClientStatus.HANDSHAKE1_AUTHENTICATING: 'Authenticating',
+    ClientStatus.HANDSHAKE2_UPLOAD_METADATA: 'Syncing metadata',
+    ClientStatus.CONNECTION_ERROR: 'Connection error',
+    ClientStatus.GETTER_ERROR: 'Getter error',
+    ClientStatus.SETTER_ERROR: 'Setter error',
+}
+
+
 def overrides(interface_class):
     def overrider(method):
         assert (method.__name__ in dir(interface_class))

@@ -316,7 +316,8 @@ class TUClient:
                 elif msg_code == ProtocolCode.STATUS:
                     # The ID of the client or CLI tool that was requesting the status report
                     requesting_client_id_in_hex_str = msg[2]
-                    self._protocol.status_reply(requesting_client_id_in_hex_str, self._status)
+                    self._protocol.status_reply(requesting_client_id_in_hex_str, self._cluster_name, self._node_name,
+                                                self._status)
                     continue
                 elif msg_code == 'DATALENWRONG':
                     self._logger.error('Client node {node_name} received data length wrong error. Exiting.'

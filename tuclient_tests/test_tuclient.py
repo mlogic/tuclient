@@ -23,9 +23,9 @@ __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
-import logging
+import re
+import subprocess
 from tuclient_tests import MockTUGateway
-import os
 import sys
 from threading import Thread
 from tuclient import *
@@ -52,17 +52,33 @@ class TestTUClient(unittest.TestCase):
             client1_thread = Thread(target=client1.start)
             client1_thread.start()
             # Create a controller to talk to client1
-            client1_controller_uuid = uuid1()
-            client1_controller = ZMQProtocol(logger, client1_controller_uuid)
-            client1_status = client1_controller.status()
-            self.assertIn(client1_status, [ClientStatus.ALL_OK, ClientStatus.OFFLINE,
-                                           ClientStatus.HANDSHAKE1_AUTHENTICATING,
-                                           ClientStatus.HANDSHAKE2_UPLOAD_METADATA])
-            start_ts = monotonic_time()
-            while client1_controller.status() != ClientStatus.ALL_OK:
-                if monotonic_time() - start_ts > 5:
-                    print('Timeout. Client1 failed to come online.')
-                    os._exit(1)
+            try:
+                client1_controller_uuid = uuid1()
+                client1_controller = ZMQProtocol(logger, client1_controller_uuid)
+                client1_status = client1_controller.status()[3]
+                self.assertIn(client1_status, [ClientStatus.ALL_OK, ClientStatus.OFFLINE,
+                                               ClientStatus.HANDSHAKE1_AUTHENTICATING,
+                                               ClientStatus.HANDSHAKE2_UPLOAD_METADATA])
+                start_ts = monotonic_time()
+                while client1_controller.status()[3] != ClientStatus.ALL_OK:
+                    if monotonic_time() - start_ts > 5:
+                        print('Timeout. Client1 failed to come online.')
+                        os._exit(1)
 
-            client1.stop()
-            client1_thread.join()
+                # Test the CLI tool, lc.py
+                lc_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../lc.py')
+                cmd = lc_path + ' client status'
+                cp = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+                return_code = cp.returncode
+                if return_code != 0:
+                    print('Subprocess {cmd} returned error with code {rc} and output:'.format(cmd=cmd, rc=return_code),
+                          file=sys.stderr, flush=True)
+                    print(cp.stdout.decode('utf-8'), file=sys.stderr, end='', flush=True)
+                    exit(1)
+                cp_str = cp.stdout.decode('utf-8')
+                self.assertIn('Cluster name: test_cluster', cp_str)
+                self.assertIn('Client node name: client1', cp_str)
+                self.assertIn('status: Running', cp_str)
+            finally:
+                client1.stop()
+                client1_thread.join()

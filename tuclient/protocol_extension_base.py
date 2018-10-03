@@ -109,12 +109,14 @@ class ProtocolExtensionBase(object):
         pass
 
     @abc.abstractmethod
-    def status_reply(self, client_id_in_hex_str, client_status):
-        # type: (str, ClientStatus) -> None
+    def status_reply(self, client_id_in_hex_str, cluster_name, node_name, client_status):
+        # type: (str, str, str, ClientStatus) -> None
         """Return client_status to a client
 
         This is used by tuclient to reply to an asynchronous status query.
 
         :param client_id_in_hex_str: UUID is not JSON serializable so we use uuid.hex here
+        :param cluster_name: name of the cluster
+        :param node_name: name of the node
         :param client_status: status of the client to reply to the querying client"""
         pass

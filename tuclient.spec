@@ -123,6 +123,7 @@ fi
 %{python2_sitelib}/tuclient_extensions
 %{python2_sitelib}/tuclient_tests
 %endif
+%{_sbindir}/lc
 %{_sbindir}/tuclientd
 %dir %{_sysconfdir}/tuclient
 %config(noreplace) %{_sysconfdir}/tuclient/tuclient.conf
