@@ -74,18 +74,20 @@ from .tulogging import *
 from uuid import *
 
 
-class ProtocolCode(IntEnum):
-    HEARTBEAT = 1
-    OK = 2
-    # Request status report from the client
-    STATUS = 3
-    ACTION = 4
-    # Reply from the client for the STATUS request
-    STATUS_REPLY = 5
-    KEY = 10
-    PI_PARAMETER_META = 11
-    WRONG_KEY = 20
-    BAD_MSG = 21
+# We could have used IntEnum, but it wasn't JSON serializable in Python 2.7.
+# The problem for custom JSON Encoder is that you have to write one as_enum for each
+# module. We just use simple int instead.
+ProtocolCode_HEARTBEAT = 1
+ProtocolCode_OK = 2
+# Request status report from the client
+ProtocolCode_STATUS = 3
+ProtocolCode_ACTION = 4
+# Reply from the client for the STATUS request
+ProtocolCode_STATUS_REPLY = 5
+ProtocolCode_KEY = 10
+ProtocolCode_PI_PARAMETER_META = 11
+ProtocolCode_WRONG_KEY = 20
+ProtocolCode_BAD_MSG = 21
 
 
 class TUClient:
@@ -186,7 +188,7 @@ class TUClient:
                     self._status = ClientStatus.HANDSHAKE1_AUTHENTICATING
                     # Handshake
                     self.timestamp_and_send_list(
-                        [ProtocolCode.KEY, self._api_secret_key, self._cluster_name, self._node_name])
+                        [ProtocolCode_KEY, self._api_secret_key, self._cluster_name, self._node_name])
                     timeout_start = monotonic_time()
                     current_error_msg = 'Failed to connect to the gateway'
                     self._logger.info('Client node {node_name} initiated handshaking. Step 1: authenticating...'.format(node_name=self._node_name))
@@ -256,20 +258,20 @@ class TUClient:
                 # Remember to use 'continue' after successfully processing requests. Otherwise the default
                 # catch-all warning at the bottom will be triggered.
                 msg_code = msg[1]
-                if msg_code == ProtocolCode.HEARTBEAT:
+                if msg_code == ProtocolCode_HEARTBEAT:
                     continue
-                elif msg_code == ProtocolCode.BAD_MSG:
+                elif msg_code == ProtocolCode_BAD_MSG:
                     err_msg = 'Received BAD_MSG reply.'
                     if len(msg) >= 3:
                         err_msg = err_msg + ' ' + str(msg[2])
                     if current_error_msg is not None:
                         err_msg = current_error_msg + ' ' + err_msg
                     raise TUCommunicationError(err_msg)
-                elif msg_code == ProtocolCode.WRONG_KEY:
+                elif msg_code == ProtocolCode_WRONG_KEY:
                     if self._status == ClientStatus.HANDSHAKE1_AUTHENTICATING:
                         raise KeyError(current_error_msg + ' Please check API secret key. Exiting...')
                     # For all other status, the default catch all warning below will be issued
-                elif msg_code == ProtocolCode.OK:
+                elif msg_code == ProtocolCode_OK:
                     if self._status == ClientStatus.HANDSHAKE1_AUTHENTICATING:
                         self._status = ClientStatus.HANDSHAKE2_UPLOAD_METADATA
                         self._logger.info(
@@ -293,7 +295,7 @@ class TUClient:
                                     assert isinstance(setter.parameter_names, list)
                                     param_metadata += setter.parameter_names
 
-                        self.timestamp_and_send_list([ProtocolCode.PI_PARAMETER_META, pi_metadata, param_metadata])
+                        self.timestamp_and_send_list([ProtocolCode_PI_PARAMETER_META, pi_metadata, param_metadata])
                         timeout_start = monotonic_time()
                         current_error_msg = 'Failed to register PI and parameter metadata.'
                         continue
@@ -305,7 +307,7 @@ class TUClient:
                         timeout_start = None
                         current_error_msg = None
                         continue
-                elif msg_code == ProtocolCode.ACTION:
+                elif msg_code == ProtocolCode_ACTION:
                     actions = msg[2]
                     self._logger.info('Performing action ' + str(actions))
                     for c in self._setters:
@@ -313,7 +315,7 @@ class TUClient:
                     self._logger.info('Finished performing action.')
                     self.timestamp_and_send_list(['ACTIONDONE'])
                     continue
-                elif msg_code == ProtocolCode.STATUS:
+                elif msg_code == ProtocolCode_STATUS:
                     # The ID of the client or CLI tool that was requesting the status report
                     requesting_client_id_in_hex_str = msg[2]
                     self._protocol.status_reply(requesting_client_id_in_hex_str, self._cluster_name, self._node_name,

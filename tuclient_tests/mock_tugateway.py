@@ -24,12 +24,8 @@ __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
-import json
-import os
 import threading
-import time
-import traceback
-from tuclient import ClientStatus, ProtocolCode
+from tuclient import *
 from uuid import *
 import zlib
 import zmq
@@ -111,22 +107,22 @@ class MockTUGateway(object):
                 self._logger.error('Received a message with unsupported protocol version {ver}'.format(ver=req[0]))
                 continue
 
-            if req[2] == ProtocolCode.KEY:
+            if req[2] == ProtocolCode_KEY:
                 self._clients[client_id] = ClientStatus.HANDSHAKE1_AUTHENTICATING
-                self._send_to_client(client_id, [ProtocolCode.OK])
+                self._send_to_client(client_id, [ProtocolCode_OK])
                 continue
 
             if client_id not in self._clients:
                 raise RuntimeError('Client {client_id} not authenticated. Exiting.'.
                                    format(client_id=client_id))
 
-            if req[2] == ProtocolCode.PI_PARAMETER_META:
+            if req[2] == ProtocolCode_PI_PARAMETER_META:
                 if self._clients[client_id] == ClientStatus.HANDSHAKE1_AUTHENTICATING:
                     self._clients[client_id] = ClientStatus.ALL_OK
-                    self._send_to_client(client_id, [ProtocolCode.OK])
+                    self._send_to_client(client_id, [ProtocolCode_OK])
                     continue
                 else:
-                    raise RuntimeError('Received ProtocolCode.PI_PARAMETER_META at the wrong time. Exiting.')
+                    raise RuntimeError('Received ProtocolCode_PI_PARAMETER_META at the wrong time. Exiting.')
 
         self._logger.debug('mock_tugateway stopped')
 

@@ -24,6 +24,7 @@ __docformat__ = 'reStructuredText'
 
 import errno
 import json
+import sys
 import threading
 from tuclient import *
 from uuid import *
@@ -31,12 +32,13 @@ import zlib
 import zmq
 
 
-class ZMQProtocolCmdCode(IntEnum):
-    # Starting with 100 to prevent collision with ProtocolCode
-    # Instruct the protocol to forward the payload to gateway
-    SEND = 100
-    # Instruct the ZMQProtocol (not the client) to exit
-    EXIT = 101
+# We could have used IntEnum, but it wasn't JSON serializable in Python 2.7.
+# The problem for custom JSON Encoder is that you have to write one as_enum for each
+# module. We just use simple int instead.
+# Starting with 100 to prevent collision with ProtocolCode
+# Instruct the protocol to forward the payload to gateway
+ZMQProtocolCmdCode_SEND = 100
+ZMQProtocolCmdCode_EXIT = 101
 
 
 class ZMQProtocol(ProtocolExtensionBase):
@@ -157,22 +159,22 @@ class ZMQProtocol(ProtocolExtensionBase):
             if self._gateway_socket in p:
                 try:
                     msg = self._recv_message(self._gateway_socket, with_id=False)
-                except (ValueError, json.decoder.JSONDecodeError, TUCommunicationError):
+                except (ValueError, JSONDecodeError, TUCommunicationError):
                     continue
                 self._target_queue.put(msg[1:])
             elif self._cmd_socket in p:
                 client_id, msg = self._recv_message(self._cmd_socket, with_id=True)
-                if msg[2] == ZMQProtocolCmdCode.SEND:
+                if msg[2] == ZMQProtocolCmdCode_SEND:
                     # msg[3] is already a ts. Don't add our own timestamp.
                     self._send_list(self._gateway_socket, msg[3:])
-                elif msg[2] == ProtocolCode.STATUS:
+                elif msg[2] == ProtocolCode_STATUS:
                     self._logger.debug('Status request received, sending to target queue...')
                     self._target_queue.put(msg[1:3] + [client_id.hex])
-                elif msg[2] == ProtocolCode.STATUS_REPLY:
+                elif msg[2] == ProtocolCode_STATUS_REPLY:
                     sending_to_client_id = UUID(hex=msg[3])
                     payload = msg[3:]
                     self._timestamp_and_send_list(self._cmd_socket, payload, sending_to_client_id)
-                elif msg[2] == ZMQProtocolCmdCode.EXIT:
+                elif msg[2] == ZMQProtocolCmdCode_EXIT:
                     self._logger.info('Received exit command from {client_id}. Stopping poller loop...'.
                                       format(client_id=client_id))
                     return
@@ -196,7 +198,7 @@ class ZMQProtocol(ProtocolExtensionBase):
         # prefix it with the protocol version
         data = [ZMQProtocol.PROTOCOL_VER] + data
 
-        sock.send(zlib.compress(json.dumps(data).encode('ascii')))
+        sock.send(zlib.compress(json.dumps(data, cls=EnumEncoder).encode('utf8')))
         self._logger.info('Message sent using socket {sock} at {ts}: {data}'.format(sock=str(sock), ts=time.time(),
                                                                                     data=str(data)))
 
@@ -206,7 +208,7 @@ class ZMQProtocol(ProtocolExtensionBase):
 
         The message is forwarded to the poller thread, which controls the ZMQContext
         and will do the actual sending, through the command socket."""
-        self._send_to_cmd_socket([ZMQProtocolCmdCode.SEND] + data)
+        self._send_to_cmd_socket([ZMQProtocolCmdCode_SEND] + data)
 
     @overrides(ProtocolExtensionBase)
     def disconnect(self):
@@ -216,7 +218,7 @@ class ZMQProtocol(ProtocolExtensionBase):
         automatically upon exit. This method is NOT thread-safe but should be idempotent."""
         if self._poller_thread is not None:
             self._logger.info('Requesting poller to stop...')
-            self._send_to_cmd_socket([ZMQProtocolCmdCode.EXIT])
+            self._send_to_cmd_socket([ZMQProtocolCmdCode_EXIT])
             self._poller_thread.join()
             self._poller_thread = None
 
@@ -242,8 +244,12 @@ class ZMQProtocol(ProtocolExtensionBase):
 
         data = sock.recv()
         try:
-            msg = json.loads(zlib.decompress(data))
-        except json.decoder.JSONDecodeError as err:
+            data = zlib.decompress(data)
+            # The decode() is not needed for Python 3 but is required by Python 2.7,
+            # which cannot tell byte string and Unicode apart.
+            data = data.decode('utf8')
+            msg = json.loads(data, object_hook=as_enum)
+        except JSONDecodeError as err:
             self._logger.error('Failed decoding a command message with error {err}: {data}'.format(
                 err=err, data=str(data)))
             raise
@@ -322,7 +328,7 @@ class ZMQProtocol(ProtocolExtensionBase):
 
     def status(self):
         # type: () -> Tuple[str, str, str, ClientStatus]
-        msg = self._send_to_cmd_socket([ProtocolCode.STATUS], wait_for_reply=True)
+        msg = self._send_to_cmd_socket([ProtocolCode_STATUS], wait_for_reply=True)
         client_id_str = msg[1]
         cluster_name = msg[2]
         client_node_name = msg[3]
@@ -335,5 +341,5 @@ class ZMQProtocol(ProtocolExtensionBase):
         """Send a status reply to client_id
 
         tuclient calls this function to send back a reply to the STATUS request to the client with client_id."""
-        self._send_to_cmd_socket([ProtocolCode.STATUS_REPLY, client_id_in_hex_str, cluster_name, node_name,
+        self._send_to_cmd_socket([ProtocolCode_STATUS_REPLY, client_id_in_hex_str, cluster_name, node_name,
                                   client_status], wait_for_reply=False)

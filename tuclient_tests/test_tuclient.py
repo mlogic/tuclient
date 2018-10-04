@@ -68,14 +68,24 @@ class TestTUClient(unittest.TestCase):
                 # Test the CLI tool, lc.py
                 lc_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../lc.py')
                 cmd = lc_path + ' client status'
-                cp = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+                # subprocess.run() is not available in Python 2.7
+                if sys.version_info[0] >= 3:
+                    cp = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+                    cp_str = cp.stdout.decode('utf-8')
+                else:
+                    # The following ugly code is only needed for Python 2
+                    cp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+                    cp_str = ''
+                    while cp.poll() is None:
+                        cp_str += cp.stdout.read()
+                    cp_str += cp.communicate()[0]
+
                 return_code = cp.returncode
                 if return_code != 0:
                     print('Subprocess {cmd} returned error with code {rc} and output:'.format(cmd=cmd, rc=return_code),
                           file=sys.stderr, flush=True)
                     print(cp.stdout.decode('utf-8'), file=sys.stderr, end='', flush=True)
                     exit(1)
-                cp_str = cp.stdout.decode('utf-8')
                 self.assertIn('Cluster name: test_cluster', cp_str)
                 self.assertIn('Client node name: client1', cp_str)
                 self.assertIn('status: Running', cp_str)

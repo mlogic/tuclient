@@ -54,12 +54,13 @@ Requires(postun): systemd
 BuildRequires: %{_py}, %{_py}-devel
 Requires: %{_py}-decorator, %{_py}-pyudev, %{_py}-configobj
 Requires: %{_py}-schedutils, %{_py}-linux-procfs, %{_py}-perf
-Requires: %{_py}-daemon, %{_py}-zmq, %{_py}-enum, %{_py}-typing
+Requires: %{_py}-daemon, %{_py}-zmq, %{_py}-typing
 # requires for packages with inconsistent python2/3 names
 %if %{with python3}
 Requires: python3-dbus, python3-gobject-base
 %else
-Requires: dbus-python, pygobject3-base, python-configparser, python-monotonic
+Requires: dbus-python, pygobject3-base, python-configparser, python-enum34
+Requires: python-monotonic
 %endif
 Requires: virt-what, ethtool, gawk, hdparm
 Requires: util-linux, dbus, polkit
