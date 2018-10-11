@@ -15,7 +15,7 @@
 # License along with this library; if not, see
 # https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
 from __future__ import absolute_import, division, print_function, unicode_literals
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 __author__ = 'Yan Li'
 __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
@@ -23,8 +23,7 @@ __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
 import abc
-from .common import ClientStatus
-from enum import IntEnum
+from .common import *
 import logging
 from uuid import UUID
 # This file has to be Python 2/3 compatible
@@ -103,13 +102,13 @@ class ProtocolExtensionBase(object):
         pass
 
     @abc.abstractmethod
-    def status(self):
+    def client_status(self):
         # type: () -> ClientStatus
         """Query the status of the client"""
         pass
 
     @abc.abstractmethod
-    def status_reply(self, client_id_in_hex_str, cluster_name, node_name, client_status):
+    def client_status_reply(self, client_id_in_hex_str, cluster_name, node_name, client_status):
         # type: (str, str, str, ClientStatus) -> None
         """Return client_status to a client
 
@@ -119,4 +118,23 @@ class ProtocolExtensionBase(object):
         :param cluster_name: name of the cluster
         :param node_name: name of the node
         :param client_status: status of the client to reply to the querying client"""
+        pass
+
+    @abc.abstractmethod
+    def cluster_status(self):
+        # type: () -> Tuple[str, ClusterStatus, List[str, str, ClientStatus]]
+        """Query the status of the cluster"""
+        pass
+
+    @abc.abstractmethod
+    def cluster_status_reply(self, client_id_in_hex_str, cluster_name, cluster_status, client_list):
+        # type: (str, str, ClusterStatus, List[str, str, ClientStatus]) -> None
+        """Return client_status to a client
+
+        This is used by tuclient to reply to an asynchronous status query.
+
+        :param client_id_in_hex_str: UUID is not JSON serializable so we use uuid.hex here
+        :param cluster_name: name of the cluster
+        :param cluster_status: status of the cluster
+        :param client_list: list of known clients of the cluster as (client_id, client_name, client status)"""
         pass

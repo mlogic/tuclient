@@ -57,7 +57,7 @@ class ZMQProtocol(ProtocolExtensionBase):
     CMD_SOCKET_ADDR = 'tcp://127.0.0.1:7778'
 
     def __init__(self, logger, client_id, gateway_address=None):
-        """Create a ZMQProtocl instance
+        """Create a ZMQProtocol instance
 
         :param gateway_address: the IP and port of gateway, can be left empty when being used as a tuclient
         controller"""
@@ -167,10 +167,10 @@ class ZMQProtocol(ProtocolExtensionBase):
                 if msg[2] == ZMQProtocolCmdCode_SEND:
                     # msg[3] is already a ts. Don't add our own timestamp.
                     self._send_list(self._gateway_socket, msg[3:])
-                elif msg[2] == ProtocolCode_STATUS:
+                elif msg[2] in (ProtocolCode_CLIENT_STATUS, ProtocolCode_CLUSTER_STATUS):
                     self._logger.debug('Status request received, sending to target queue...')
                     self._target_queue.put(msg[1:3] + [client_id.hex])
-                elif msg[2] == ProtocolCode_STATUS_REPLY:
+                elif msg[2] in (ProtocolCode_CLIENT_STATUS_REPLY, ProtocolCode_CLUSTER_STATUS_REPLY):
                     sending_to_client_id = UUID(hex=msg[3])
                     payload = msg[3:]
                     self._timestamp_and_send_list(self._cmd_socket, payload, sending_to_client_id)
@@ -326,9 +326,10 @@ class ZMQProtocol(ProtocolExtensionBase):
             if context is not None:
                 context.destroy()
 
-    def status(self):
+    def client_status(self):
         # type: () -> Tuple[str, str, str, ClientStatus]
-        msg = self._send_to_cmd_socket([ProtocolCode_STATUS], wait_for_reply=True)
+        """Query the client status through command socket"""
+        msg = self._send_to_cmd_socket([ProtocolCode_CLIENT_STATUS], wait_for_reply=True)
         client_id_str = msg[1]
         cluster_name = msg[2]
         client_node_name = msg[3]
@@ -336,10 +337,31 @@ class ZMQProtocol(ProtocolExtensionBase):
         return client_id_str, cluster_name, client_node_name, client_status
 
     @overrides(ProtocolExtensionBase)
-    def status_reply(self, client_id_in_hex_str, cluster_name, node_name, client_status):
+    def client_status_reply(self, client_id_in_hex_str, cluster_name, node_name, client_status):
         # type: (str, str, str, ClientStatus) -> None
         """Send a status reply to client_id
 
-        tuclient calls this function to send back a reply to the STATUS request to the client with client_id."""
-        self._send_to_cmd_socket([ProtocolCode_STATUS_REPLY, client_id_in_hex_str, cluster_name, node_name,
+        tuclient calls this function to send back a reply to the CLIENT_STATUS request to
+        the client with client_id."""
+        self._send_to_cmd_socket([ProtocolCode_CLIENT_STATUS_REPLY, client_id_in_hex_str, cluster_name, node_name,
                                   client_status], wait_for_reply=False)
+
+    @overrides(ProtocolExtensionBase)
+    def cluster_status(self):
+        # type: () -> Tuple[str, ClusterStatus, List[str, str, ClientStatus]]
+        """Query the client status through command socket"""
+        msg = self._send_to_cmd_socket([ProtocolCode_CLUSTER_STATUS], wait_for_reply=True)
+        cluster_name = msg[2]
+        cluster_status = msg[3]
+        client_list = msg[4]
+        return cluster_name, cluster_status, client_list
+
+    @overrides(ProtocolExtensionBase)
+    def cluster_status_reply(self, client_id_in_hex_str, cluster_name, cluster_status, client_list):
+        # type: (str, str, ClusterStatus, List[str, str, ClientStatus]) -> None
+        """Send a cluster status reply to client_id
+
+        tuclient calls this function to send back a reply to the CLUSTER_STATUS request to
+        the client with client_id."""
+        self._send_to_cmd_socket([ProtocolCode_CLUSTER_STATUS_REPLY, client_id_in_hex_str, cluster_name, cluster_status,
+                                  client_list], wait_for_reply=False)

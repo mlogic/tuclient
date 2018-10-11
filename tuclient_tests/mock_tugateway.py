@@ -37,8 +37,11 @@ class MockTUGateway(object):
     def __init__(self, logger, listen_on='127.0.0.1:7777'):
         self._logger = logger
         self._listen_on = listen_on
+        self._cluster_name = None
+        self._cluster_status = ClusterStatus.NOT_SETUP
         self._stopped = False
-        self._clients = dict()  # type: Dict[UUID, ClientStatus]
+        self._clients_status = dict()  # type: Dict[UUID, ClientStatus]
+        self._clients_name = dict()    # type: Dict[UUID, str]
         self._thread = threading.Thread(target=self._thread_func)
         self._thread.start()
 
@@ -69,7 +72,7 @@ class MockTUGateway(object):
         if not isinstance(obj, list):
             obj = [obj, ]
         obj = [MockTUGateway.PROTOCOL_VER, time.time()] + obj
-        self._socket.send(zlib.compress(json.dumps(obj).encode('ascii')))
+        self._socket.send(zlib.compress(json.dumps(obj, cls=EnumEncoder).encode('ascii')))
 
     def _thread_func(self):
         try:
@@ -97,7 +100,7 @@ class MockTUGateway(object):
                 continue
             client_id = UUID(bytes=self._socket.recv())
             payload = self._socket.recv()
-            req = json.loads(zlib.decompress(payload))
+            req = json.loads(zlib.decompress(payload), object_hook=as_enum)
 
             if len(req) < 2:
                 self._logger.error('Received a corrupted message: message too short (length is {len}).'.
@@ -108,21 +111,44 @@ class MockTUGateway(object):
                 continue
 
             if req[2] == ProtocolCode_KEY:
-                self._clients[client_id] = ClientStatus.HANDSHAKE1_AUTHENTICATING
+                self._clients_status[client_id] = ClientStatus.HANDSHAKE1_AUTHENTICATING
+                self._clients_name[client_id] = req[5]
+                if self._cluster_name is None:
+                    self._cluster_name = req[4]
+                else:
+                    if self._cluster_name != req[4]:
+                        raise RuntimeError('Client sent in wrong cluster name')
+
                 self._send_to_client(client_id, [ProtocolCode_OK])
                 continue
 
-            if client_id not in self._clients:
+            if client_id not in self._clients_status:
                 raise RuntimeError('Client {client_id} not authenticated. Exiting.'.
                                    format(client_id=client_id))
 
             if req[2] == ProtocolCode_PI_PARAMETER_META:
-                if self._clients[client_id] == ClientStatus.HANDSHAKE1_AUTHENTICATING:
-                    self._clients[client_id] = ClientStatus.ALL_OK
+                if self._clients_status[client_id] == ClientStatus.HANDSHAKE1_AUTHENTICATING:
+                    self._clients_status[client_id] = ClientStatus.ALL_OK
                     self._send_to_client(client_id, [ProtocolCode_OK])
                     continue
                 else:
                     raise RuntimeError('Received ProtocolCode_PI_PARAMETER_META at the wrong time. Exiting.')
+            elif req[2] == ProtocolCode_CLUSTER_STATUS:
+                requesting_client_id_in_hex_str = req[3]
+                self._send_to_client(client_id, [ProtocolCode_CLUSTER_STATUS_REPLY, requesting_client_id_in_hex_str,
+                                                 self._cluster_name, self._cluster_status,
+                                                 [(client_id.hex, self._clients_name[client_id], self._clients_status[client_id]) for client_id in self._clients_status.keys()]])
 
         self._logger.debug('mock_tugateway stopped')
 
+
+if __name__ == '__main__':
+    logger = logging.getLogger()
+    logger.addHandler(logging.StreamHandler(sys.stdout))
+    logger.setLevel(logging.WARNING)
+
+    gateway_addr = '127.0.0.1:7777'
+    with MockTUGateway(logger, gateway_addr):
+        print('MockTUGateway started')
+        while True:
+            time.sleep(1)

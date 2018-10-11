@@ -17,28 +17,29 @@
 # https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import argparse
-import logging
-import sys
-from tuclient import ClientStatusToStrMapping, get_console_logger
-from tuclient_extensions import ZMQProtocol
-from uuid import uuid1
-
 __author__ = 'Yan Li'
 __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
+
+import argparse
+import logging
+import sys
+from tuclient import ClientStatusToStrMapping, ClusterStatusToStrMapping, get_console_logger
+from tuclient_extensions import ZMQProtocol
+from uuid import uuid1
 
 
 logger = get_console_logger()
 
 
 def client_handler(sub_args):
+    print(sub_args)
     if sub_args.status is not None:
         # Create a controller to talk to client1
         client_controller = ZMQProtocol(logger, uuid1())
         logger.info('Querying the status of the client running on the local machine...')
-        client_id_str, cluster_name, client_node_name, client_status = client_controller.status()
+        client_id_str, cluster_name, client_node_name, client_status = client_controller.client_status()
         logger.info('Got the status reply')
         print('Cluster name: ' + cluster_name)
         print('Client node name: ' + client_node_name)
@@ -48,7 +49,22 @@ def client_handler(sub_args):
 
 def cluster_handler(sub_args):
     if sub_args.status is not None:
-        print('Cluster status')
+        # Create a controller to talk to client1, which in turn talks to the cluster
+        client_controller = ZMQProtocol(logger, uuid1())
+        logger.info('Querying the status of the cluster...')
+        cluster_name, cluster_status, client_list = client_controller.cluster_status()
+        logger.info('Got the status reply')
+        print('Cluster name: ' + cluster_name)
+        print('Cluster status: ' + ClusterStatusToStrMapping[cluster_status])
+        print()
+        print('List of client nodes:')
+        print('==========================================')
+        for client_id, client_name, client_status in client_list:
+            print('{client_id:10},{client_name:30},{client_status}'.
+                  format(client_id=client_id, client_name=client_name,
+                         client_status=ClientStatusToStrMapping[client_status]))
+        print()
+        print('Total number of nodes: {num}'.format(num=len(client_list)))
 
 
 if __name__ == '__main__':

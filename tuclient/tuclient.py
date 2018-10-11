@@ -80,10 +80,12 @@ from uuid import *
 ProtocolCode_HEARTBEAT = 1
 ProtocolCode_OK = 2
 # Request status report from the client
-ProtocolCode_STATUS = 3
+ProtocolCode_CLIENT_STATUS = 3
 ProtocolCode_ACTION = 4
 # Reply from the client for the STATUS request
-ProtocolCode_STATUS_REPLY = 5
+ProtocolCode_CLIENT_STATUS_REPLY = 5
+ProtocolCode_CLUSTER_STATUS = 6
+ProtocolCode_CLUSTER_STATUS_REPLY = 7
 ProtocolCode_KEY = 10
 ProtocolCode_PI_PARAMETER_META = 11
 ProtocolCode_WRONG_KEY = 20
@@ -315,11 +317,25 @@ class TUClient:
                     self._logger.info('Finished performing action.')
                     self.timestamp_and_send_list(['ACTIONDONE'])
                     continue
-                elif msg_code == ProtocolCode_STATUS:
+                elif msg_code == ProtocolCode_CLIENT_STATUS:
                     # The ID of the client or CLI tool that was requesting the status report
                     requesting_client_id_in_hex_str = msg[2]
-                    self._protocol.status_reply(requesting_client_id_in_hex_str, self._cluster_name, self._node_name,
-                                                self._status)
+                    self._protocol.client_status_reply(requesting_client_id_in_hex_str, self._cluster_name, self._node_name,
+                                                       self._status)
+                    continue
+                elif msg_code == ProtocolCode_CLUSTER_STATUS:
+                    # Query the cluster about its status
+                    requesting_client_id_in_hex_str = msg[2]
+                    self.timestamp_and_send_list([ProtocolCode_CLUSTER_STATUS, requesting_client_id_in_hex_str])
+                    continue
+                elif msg_code == ProtocolCode_CLUSTER_STATUS_REPLY:
+                    # The ID of the client or CLI tool that was requesting the status report
+                    requesting_client_id_in_hex_str = msg[2]
+                    cluster_name = msg[3]
+                    cluster_status = msg[4]
+                    client_list = msg[5]
+                    self._protocol.cluster_status_reply(requesting_client_id_in_hex_str, cluster_name, cluster_status,
+                                                        client_list)
                     continue
                 elif msg_code == 'DATALENWRONG':
                     self._logger.error('Client node {node_name} received data length wrong error. Exiting.'

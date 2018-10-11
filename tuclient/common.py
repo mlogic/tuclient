@@ -22,11 +22,16 @@ __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
+import sys
+import subprocess
+
 # Python 2.7 doesn't have JSONDecodeError; it uses ValueError instead
 try:
     from json.decoder import JSONDecodeError
 except ImportError:
     JSONDecodeError = ValueError
+
+
 # Python 2.7 doesn't have time.monotonic().
 import time
 try:
@@ -66,6 +71,25 @@ ClientStatusToStrMapping = {
     ClientStatus.SETTER_ERROR: 'Setter error',
 }
 
+class ClusterStatus(Enum):
+    OFFLINE = 30
+    TUNING_TARGET_REACHED = 31
+    NOT_SETUP = 32
+    TUNING_TARGET_NOT_REACHED = 33
+    CLIENT_CONNECTION_ERROR = 34
+    CLIENT_ERROR = 35
+    INTERNAL_ERROR = 36
+
+ClusterStatusToStrMapping = {
+    ClusterStatus.OFFLINE: 'Offline',
+    ClusterStatus.TUNING_TARGET_REACHED: 'Tuning; training finished',
+    ClusterStatus.NOT_SETUP: 'Not setup',
+    ClusterStatus.TUNING_TARGET_NOT_REACHED: 'Tuning; training not finished',
+    ClusterStatus.CLIENT_CONNECTION_ERROR: 'Cannot connect to all clients',
+    ClusterStatus.CLIENT_ERROR: 'One or more client error',
+    ClusterStatus.INTERNAL_ERROR: 'Internal error; contact support'
+}
+
 
 # Enum is not JSON serializable. IntEnum is, but in Python 3 only. So we write
 # our own Enum JSON Encoder and decoder.
@@ -89,3 +113,27 @@ def overrides(interface_class):
         return method
 
     return overrider
+
+
+def run_shell_command(cmd):
+    # type: (str) -> str
+    """Run a shell command and return its stdout"""
+    # subprocess.run() is not available in Python 2.7
+    if sys.version_info[0] >= 3:
+        cp = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+        cp_str = cp.stdout.decode('utf-8')
+    else:
+        # The following ugly code is only needed for Python 2
+        cp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+        cp_str = ''
+        while cp.poll() is None:
+            cp_str += cp.stdout.read()
+        cp_str += cp.communicate()[0]
+
+    return_code = cp.returncode
+    if return_code != 0:
+        err_msg = 'Subprocess {cmd} returned error code {rc} and output: {cp_str}'.format(cmd=cmd, rc=return_code,
+                                                                                          cp_str=cp_str)
+        raise RuntimeError(err_msg)
+
+    return cp_str
