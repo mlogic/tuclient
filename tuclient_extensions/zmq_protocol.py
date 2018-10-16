@@ -54,9 +54,8 @@ class ZMQProtocol(ProtocolExtensionBase):
     worker thread or tuclient.
     """
     PROTOCOL_VER = 1
-    CMD_SOCKET_ADDR = 'tcp://127.0.0.1:7778'
 
-    def __init__(self, logger, client_id, gateway_address=None):
+    def __init__(self, logger, client_id, gateway_address=None, cmd_socket_addr=None):
         """Create a ZMQProtocol instance
 
         :param gateway_address: the IP and port of gateway, can be left empty when being used as a tuclient
@@ -70,6 +69,7 @@ class ZMQProtocol(ProtocolExtensionBase):
         self._cmd_socket = None      # type: Optional[zmq.Socket]
         self._poller = None          # type: Optional[zmq.Poller]
         self._poller_thread = None   # type: Optional[threading.Thread]
+        self._cmd_socket_addr = 'tcp://127.0.0.1:7778' if cmd_socket_addr is None else cmd_socket_addr
 
     @overrides(ProtocolExtensionBase)
     def start_poller(self):
@@ -110,7 +110,7 @@ class ZMQProtocol(ProtocolExtensionBase):
         # connections.
         self._cmd_socket = self._context.socket(zmq.ROUTER)
         self._cmd_socket.set_hwm(5000)
-        self._cmd_socket.bind(ZMQProtocol.CMD_SOCKET_ADDR)
+        self._cmd_socket.bind(self._cmd_socket_addr)
 
         self._poller = zmq.Poller()
         self._poller.register(self._gateway_socket, zmq.POLLIN)
@@ -315,7 +315,7 @@ class ZMQProtocol(ProtocolExtensionBase):
             tmp_uuid = uuid1()
             s.setsockopt(zmq.IDENTITY, tmp_uuid.bytes)
             s.setsockopt(zmq.SNDTIMEO, 1000)
-            s.connect(ZMQProtocol.CMD_SOCKET_ADDR)
+            s.connect(self._cmd_socket_addr)
             self._timestamp_and_send_list(s, data)
             if wait_for_reply:
                 msg = self._poll_and_recv_message(s)

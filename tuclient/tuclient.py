@@ -82,12 +82,16 @@ ProtocolCode_OK = 2
 # Request status report from the client
 ProtocolCode_CLIENT_STATUS = 3
 ProtocolCode_ACTION = 4
+ProtocolCode_ACTION_DONE = 5
+ProtocolCode_PI = 6
+ProtocolCode_PI_RECEIVED_OK = 7
 # Reply from the client for the STATUS request
-ProtocolCode_CLIENT_STATUS_REPLY = 5
-ProtocolCode_CLUSTER_STATUS = 6
-ProtocolCode_CLUSTER_STATUS_REPLY = 7
-ProtocolCode_KEY = 10
-ProtocolCode_PI_PARAMETER_META = 11
+ProtocolCode_CLIENT_STATUS_REPLY = 8
+ProtocolCode_CLUSTER_STATUS = 9
+ProtocolCode_CLUSTER_STATUS_REPLY = 10
+ProtocolCode_KEY = 11
+ProtocolCode_PI_PARAMETER_META = 12
+ProtocolCode_CLIENT_STOP = 13
 ProtocolCode_WRONG_KEY = 20
 ProtocolCode_BAD_MSG = 21
 
@@ -125,7 +129,8 @@ class TUClient:
         self._stopped = False
         self._last_collect_time = 0
         self._collect_time_decimal = 0.5  # we always collect at the middle of a second
-        self._last_received_ts = 0        # ts when we received last feedback from TUGateway, used for checking timeout.
+        # ts when we received last feedback from TUGateway or initiated connects, used for checking timeout.
+        self._last_received_ts = 0
         # We use a global lock. This is by far only needed by test cases, which a different thread
         # calls our public functions.
         self._lock = RLock()
@@ -181,7 +186,7 @@ class TUClient:
         # GC causes unplanned stall and disrupts precisely timed collection.
         # Disable it and do it manually before sleeping.
         gc.disable()
-        timeout_start = None
+        # Used by steps to customize error message
         current_error_msg = None
         try:
             self._logger.info('Client node {node_name} started'.format(node_name=self._node_name))
@@ -191,7 +196,8 @@ class TUClient:
                     # Handshake
                     self.timestamp_and_send_list(
                         [ProtocolCode_KEY, self._api_secret_key, self._cluster_name, self._node_name])
-                    timeout_start = monotonic_time()
+                    # Reset the timeout counter after sending out a command
+                    self._last_received_ts = monotonic_time()
                     current_error_msg = 'Failed to connect to the gateway'
                     self._logger.info('Client node {node_name} initiated handshaking. Step 1: authenticating...'.format(node_name=self._node_name))
 
@@ -218,7 +224,7 @@ class TUClient:
                             else:
                                 self._logger.info('Client node {node_name} collected from all getters: {pi_data}'
                                                   .format(node_name=self._node_name, pi_data=str(pi_data)))
-                                self.timestamp_and_send_list(['PI', pi_data])
+                                self.timestamp_and_send_list([ProtocolCode_PI, pi_data])
                                 # We don't wait for 'OK' to save time
                         else:
                             pass
@@ -246,8 +252,7 @@ class TUClient:
                 try:
                     msg = self._msg_queue.get(block=True, timeout=sleep_second)
                 except Empty:
-                    if monotonic_time() - self._last_received_ts > self._network_timeout or \
-                            (timeout_start is not None and monotonic_time() - timeout_start >= self._network_timeout):
+                    if monotonic_time() - self._last_received_ts > self._network_timeout:
                         err_msg = 'Received no data in {timeout} seconds. Timeout. Reconnecting...'.\
                             format(timeout=self._network_timeout)
                         if current_error_msg is not None:
@@ -260,7 +265,7 @@ class TUClient:
                 # Remember to use 'continue' after successfully processing requests. Otherwise the default
                 # catch-all warning at the bottom will be triggered.
                 msg_code = msg[1]
-                if msg_code == ProtocolCode_HEARTBEAT:
+                if msg_code in (ProtocolCode_PI_RECEIVED_OK, ProtocolCode_HEARTBEAT):
                     continue
                 elif msg_code == ProtocolCode_BAD_MSG:
                     err_msg = 'Received BAD_MSG reply.'
@@ -298,7 +303,8 @@ class TUClient:
                                     param_metadata += setter.parameter_names
 
                         self.timestamp_and_send_list([ProtocolCode_PI_PARAMETER_META, pi_metadata, param_metadata])
-                        timeout_start = monotonic_time()
+                        # Reset the timeout counter after sending out a command
+                        self._last_received_ts = monotonic_time()
                         current_error_msg = 'Failed to register PI and parameter metadata.'
                         continue
                     elif self._status == ClientStatus.HANDSHAKE2_UPLOAD_METADATA:
@@ -306,7 +312,6 @@ class TUClient:
                         self._logger.info(
                             'Client node {node_name} registered PI and Parameter metadata.'.format(
                                 node_name=self._node_name))
-                        timeout_start = None
                         current_error_msg = None
                         continue
                 elif msg_code == ProtocolCode_ACTION:
@@ -315,7 +320,7 @@ class TUClient:
                     for c in self._setters:
                         c.action(actions)
                     self._logger.info('Finished performing action.')
-                    self.timestamp_and_send_list(['ACTIONDONE'])
+                    self.timestamp_and_send_list([ProtocolCode_ACTION_DONE])
                     continue
                 elif msg_code == ProtocolCode_CLIENT_STATUS:
                     # The ID of the client or CLI tool that was requesting the status report
@@ -358,11 +363,13 @@ class TUClient:
 
                 # A cache all for all unexpected messages. Don't put this in an 'else', because that would prevent
                 # us from catch non-matching conditions from deeper ifs above.
-                self._logger.warning('Received unexpected message: ' + str(msg))
+                self._logger.warning('Received unexpected message: {msg}. Client status: {status}.'.format(
+                    msg=str(msg), status=str(self._status)))
 
-            self.timestamp_and_send_list(['CLIENTSTOP'])
+            self.timestamp_and_send_list([ProtocolCode_CLIENT_STOP])
             self._logger.info('Client node {node_name} stopped'.format(node_name=self._node_name))
         finally:
+            self._status = ClientStatus.OFFLINE
             gc.enable()
 
             if self._debugging_level >= 1:

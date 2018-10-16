@@ -43,13 +43,6 @@ except AttributeError:
 
 
 from enum import Enum
-class ClusterStatus(Enum):
-    OFFLINE = 0
-    ALL_OK = 1
-    NOT_SETUP = 2      # This cluster hasn't been set up yet (desired cluster info not set).
-    NODES_MISMATCH = 3
-    NODES_LOST = 4
-
 class ClientStatus(Enum):
     OFFLINE = 0
     ALL_OK = 1
@@ -73,12 +66,15 @@ ClientStatusToStrMapping = {
 
 class ClusterStatus(Enum):
     OFFLINE = 30
-    TUNING_TARGET_REACHED = 31
-    NOT_SETUP = 32
-    TUNING_TARGET_NOT_REACHED = 33
-    CLIENT_CONNECTION_ERROR = 34
-    CLIENT_ERROR = 35
-    INTERNAL_ERROR = 36
+    ALL_OK = 31
+    TUNING_TARGET_REACHED = 32
+    NOT_SETUP = 33       # This cluster hasn't been set up yet (desired cluster info not set)
+    NODES_MISMATCH = 34  # One or more client node's information doesn't match desired information
+    NODES_LOST = 35
+    TUNING_TARGET_NOT_REACHED = 36
+    CLIENT_CONNECTION_ERROR = 37
+    CLIENT_ERROR = 38
+    INTERNAL_ERROR = 39
 
 ClusterStatusToStrMapping = {
     ClusterStatus.OFFLINE: 'Offline',
