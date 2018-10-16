@@ -163,10 +163,12 @@ class TUClient:
                         self._protocol.disconnect()
                     self._logger.info('Client node {node_name} network protocol disconnected, trying reconnect...'
                                       .format(node_name=self._node_name))
+                    # Continue if not stopped
                 except Exception as err:
                     self._logger.error('Client node {node_name} fatal error: {err_name}: {err}'
                                        .format(node_name=self._node_name, err_name=type(err).__name__, err=str(err)))
                     self._logger.error(traceback.format_exc())
+                    # Don't continue on other errors
                     return
         finally:
             self._protocol.disconnect()
