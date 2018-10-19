@@ -66,8 +66,6 @@ _STDOUT_LOGGER = 1
 _FILE_LOGGER = 2
 _MEMORY_LOGGER = 3
 
-_logger = None
-_logger_type = None
 FORMAT = "[%(asctime)s - %(filename)s:%(lineno)s - %(funcName)10s() ] %(message)s"
 _log_file_handler = None
 _memory_handler = None
@@ -82,17 +80,14 @@ def get_console_logger():
 
     Exception will be risen if the root logger wasn't created as a console logger.
     """
-    global _logger
-    global _logger_type
-    if _logger is not None:
-        assert _logger_type == _STDOUT_LOGGER, "Global logger was already created and isn't a console logger"
-        return _logger
-    else:
-        _logger = logging.getLogger()
-        logging.basicConfig(format=FORMAT)
-        _logger.setLevel(logging.WARN)
-        _logger_type = _STDOUT_LOGGER
-        return _logger
+    logger = logging.getLogger('console')
+    if not logger.hasHandlers():
+        stderrhandler = logging.StreamHandler()
+        stderrhandler.setFormatter(logging.Formatter(FORMAT))
+        logger.addHandler(stderrhandler)
+        logger.setLevel(logging.WARNING)
+
+    return logger
 
 
 def flush_log():
@@ -108,39 +103,31 @@ def get_file_logger(filename, lazy_flush=False):
 
     Exception will be risen if the root logger wasn't created as a file logger.
     """
-    global _logger
-    global _logger_type
-    global _log_file_handler
-    if _logger is not None:
-        assert _logger_type == _FILE_LOGGER, "Global logger was already created and isn't a file logger"
-        return _logger
-    else:
-        _logger = logging.getLogger()
-        _logger.setLevel(logging.WARN)
-
-        global _memory_handler
-        assert _memory_handler is None, "Root log file has already been set"
-
-        formatter = logging.Formatter(FORMAT)
-        _logger_type = _FILE_LOGGER
+    logger = logging.getLogger('file')
+    if not logger.hasHandlers():
         pathname = os.path.dirname(filename)
         if os.path.exists(pathname) and not os.path.isdir(pathname):
             raise FileNotFoundError('Not a valid path: \'{}\''.format(pathname))
         elif not os.path.isdir(pathname):
             os.mkdir(pathname)
+        global _log_file_handler
         _log_file_handler = logging.FileHandler(filename)
+        formatter = logging.Formatter(FORMAT)
         _log_file_handler.setFormatter(formatter)
 
+        global _memory_handler
         _memory_handler = logging.handlers.MemoryHandler(
             capacity=1024 * 100,
             flushLevel=logging.ERROR if lazy_flush else logging.DEBUG,
             target=_log_file_handler
         )
 
-        _logger.addHandler(_memory_handler)
+        logger.addHandler(_memory_handler)
 
         atexit.register(flush_log)
-        return _logger
+        logger.setLevel(logging.WARNING)
+
+    return logger
 
 
 def get_memory_logger():
@@ -150,19 +137,16 @@ def get_memory_logger():
     for test cases only.
 
     Use tulogging.memory_logger_stringio.getvalue() to get the log so far."""
-    global _logger
-    global _logger_type
-    global memory_logger_stringio
-    if _logger is not None:
-        assert _logger_type == _MEMORY_LOGGER, "Global logger was already created and isn't a memory logger"
-        return _logger
-    memory_logger_stringio = io.StringIO()
-    streamhandler = logging.StreamHandler(memory_logger_stringio)
-    streamhandler.setFormatter(logging.Formatter(FORMAT))
-    stderrhandler = logging.StreamHandler()
-    stderrhandler.setFormatter(logging.Formatter(FORMAT))
-    _logger = logging.getLogger()
-    _logger.addHandler(streamhandler)
-    _logger.addHandler(stderrhandler)
-    _logger_type = _MEMORY_LOGGER
-    return _logger
+    logger = logging.getLogger('memory')
+    if not logger.hasHandlers():
+        global memory_logger_stringio
+        memory_logger_stringio = io.StringIO()
+        streamhandler = logging.StreamHandler(memory_logger_stringio)
+        streamhandler.setFormatter(logging.Formatter(FORMAT))
+        stderrhandler = logging.StreamHandler()
+        stderrhandler.setFormatter(logging.Formatter(FORMAT))
+        logger.addHandler(streamhandler)
+        logger.addHandler(stderrhandler)
+        logger.setLevel(logging.WARNING)
+
+    return logger
