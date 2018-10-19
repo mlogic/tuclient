@@ -26,7 +26,7 @@ import abc
 from configparser import ConfigParser
 import logging
 import os
-from .tulogging import get_file_logger
+from .tulogging import get_console_logger, get_file_logger
 
 
 class ConfigBase(object):
@@ -137,7 +137,11 @@ class ConfigBase(object):
         """Get a logger as instructed by the config
         :return: the logger
         """
-        logger = get_file_logger(self.log_file())
+        log_file = self.log_file()
+        if log_file == "":
+            logger = get_console_logger()
+        else:
+            logger = get_file_logger(log_file)
         logger.setLevel(self.logging_level())
         return logger
 
