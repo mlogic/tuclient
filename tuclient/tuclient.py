@@ -94,6 +94,9 @@ ProtocolCode_PI_PARAMETER_META = 12
 ProtocolCode_CLIENT_STOP = 13
 ProtocolCode_WRONG_KEY = 20
 ProtocolCode_BAD_MSG = 21
+# Client hasn't authenticated properly
+ProtocolCode_NOT_AUTH = 22
+ProtocolCode_CLUSTER_NOT_CONFIGURED = 23
 
 
 class TUClient:
@@ -131,9 +134,6 @@ class TUClient:
         self._collect_time_decimal = 0.5  # we always collect at the middle of a second
         # ts when we received last feedback from TUGateway or initiated connects, used for checking timeout.
         self._last_received_ts = 0
-        # We use a global lock. This is by far only needed by test cases, which a different thread
-        # calls our public functions.
-        self._lock = RLock()
         self._status = ClientStatus.OFFLINE
 
         # don't call protocol.connect() because start() may be called in a different process/thread
@@ -150,28 +150,25 @@ class TUClient:
         time.sleep(0)
 
     def start(self):
-        try:
-            while not self._stopped:
-                try:
-                    self._protocol.start_poller()
-                    self._start_session()
-                    self._logger.info('Client node {node_name} session ended'.format(node_name=self._node_name))
-                except TUTimeoutError as err:
-                    self._logger.error('Client node {node_name} timeout error: {err}'.format(node_name=self._node_name,
-                                                                                             err=str(err)))
-                    with self._lock:
-                        self._protocol.disconnect()
-                    self._logger.info('Client node {node_name} network protocol disconnected, trying reconnect...'
-                                      .format(node_name=self._node_name))
-                    # Continue if not stopped
-                except Exception as err:
-                    self._logger.error('Client node {node_name} fatal error: {err_name}: {err}'
-                                       .format(node_name=self._node_name, err_name=type(err).__name__, err=str(err)))
-                    self._logger.error(traceback.format_exc())
-                    # Don't continue on other errors
-                    return
-        finally:
-            self._protocol.disconnect()
+        while not self._stopped:
+            try:
+                self._protocol.start_poller()
+                self._start_session()
+                self._logger.info('Client node {node_name} session ended'.format(node_name=self._node_name))
+            except TUTimeoutError as err:
+                self._logger.error('Client node {node_name} timeout error: {err}'.format(node_name=self._node_name,
+                                                                                         err=str(err)))
+                self._logger.info('Client node {node_name} network protocol disconnected, trying reconnect...'
+                                  .format(node_name=self._node_name))
+                # Continue if not stopped
+            except Exception as err:
+                self._logger.error('Client node {node_name} fatal error: {err_name}: {err}'
+                                   .format(node_name=self._node_name, err_name=type(err).__name__, err=str(err)))
+                self._logger.error(traceback.format_exc())
+                # Don't continue on other errors
+                return
+            finally:
+                self._protocol.disconnect()
         self._logger.info('Client node {node_name} stopped'.format(node_name=self._node_name))
 
     def _start_session(self):
@@ -344,12 +341,15 @@ class TUClient:
                     self._protocol.cluster_status_reply(requesting_client_id_in_hex_str, cluster_name, cluster_status,
                                                         client_list)
                     continue
+                elif msg_code == ProtocolCode_CLUSTER_NOT_CONFIGURED:
+                    self._logger.info('Cluster not configured yet')
+                    continue
                 elif msg_code == 'DATALENWRONG':
                     self._logger.error('Client node {node_name} received data length wrong error. Exiting.'
                                        .format(node_name=self._node_name))
                     self.stop()
                     continue
-                elif msg_code == 'NOTAUTH':
+                elif msg_code == ProtocolCode_NOT_AUTH:
                     self._logger.error('Client node {node_name} not authenticated. Try reconnecting...'
                                        .format(node_name=self._node_name))
                     return
