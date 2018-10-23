@@ -61,6 +61,7 @@ import io
 import logging
 import logging.handlers
 import os
+import sys
 
 _STDOUT_LOGGER = 1
 _FILE_LOGGER = 2
@@ -72,6 +73,25 @@ _memory_handler = None
 memory_logger_stringio = None
 
 
+def _logger_hasHandlers(logger):
+    """Function copied from Python 3.6 for Python 2.7 or lower
+    """
+    if sys.version_info[0] >= 3:
+        return logger.hasHandlers()
+
+    c = logger
+    rv = False
+    while c:
+        if c.handlers:
+            rv = True
+            break
+        if not c.propagate:
+            break
+        else:
+            c = c.parent
+    return rv
+
+
 def get_console_logger():
     """Create or return the root logger that logs to stdout output
 
@@ -81,7 +101,7 @@ def get_console_logger():
     Exception will be risen if the root logger wasn't created as a console logger.
     """
     logger = logging.getLogger('console')
-    if not logger.hasHandlers():
+    if not _logger_hasHandlers(logger):
         stderrhandler = logging.StreamHandler()
         stderrhandler.setFormatter(logging.Formatter(FORMAT))
         logger.addHandler(stderrhandler)
@@ -104,7 +124,7 @@ def get_file_logger(filename, lazy_flush=False):
     Exception will be risen if the root logger wasn't created as a file logger.
     """
     logger = logging.getLogger('file')
-    if not logger.hasHandlers():
+    if not _logger_hasHandlers(logger):
         pathname = os.path.dirname(filename)
         if os.path.exists(pathname) and not os.path.isdir(pathname):
             raise FileNotFoundError('Not a valid path: \'{}\''.format(pathname))
@@ -138,7 +158,7 @@ def get_memory_logger():
 
     Use tulogging.memory_logger_stringio.getvalue() to get the log so far."""
     logger = logging.getLogger('memory')
-    if not logger.hasHandlers():
+    if not _logger_hasHandlers(logger):
         global memory_logger_stringio
         memory_logger_stringio = io.StringIO()
         streamhandler = logging.StreamHandler(memory_logger_stringio)
