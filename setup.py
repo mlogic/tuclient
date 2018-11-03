@@ -23,21 +23,25 @@ __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
-from distutils.core import setup
+try:
+    from setuptools import setup
+except ImportError:
+    from distutils.core import setup
+import sys
 
-
-setup(name='tuclient',
-      version='0.1',
-      packages=[],
-      setup_requires=[
-          'enum',
+setup_requires = [
           'pyzmq',
           'python-daemon',
           'Sphinx',
           'sphinx_rtd_theme',
-          'typing',
-      ],
+      ]
+if sys.version_info[0] < 3:
+    setup_requires += ['enum','typing']
 
+setup(name='tuclient',
+      version='0.1',
+      packages=[],
+      setup_requires=setup_requires,
       # Metadata for PyPI
       author='Yan Li',
       author_email='yanli@tuneup.ai',
