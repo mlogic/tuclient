@@ -16,8 +16,12 @@
 # https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
 from __future__ import absolute_import, division, print_function, unicode_literals
 from typing import List
-
 from tuclient import *
+
+__author__ = 'Yan Li'
+__copyright__ = 'CONFIDENTIAL. Copyright (c) 2017-2018 Yan Li. All rights reserved.'
+__license__ = 'CONFIDENTIAL INFORMATION OF YAN LI'
+__docformat__ = 'reStructuredText'
 
 
 class Getter(GetterExtensionBase):
@@ -27,6 +31,11 @@ class Getter(GetterExtensionBase):
         """Collect Performance Indicators"""
         return [1, 2]
 
+    @property
+    @overrides(GetterExtensionBase)
+    def pi_names(self):
+        return ['pi_a', 'pi_b']
+
 
 class Setter(SetterExtensionBase):
     @overrides(SetterExtensionBase)
@@ -35,3 +44,8 @@ class Setter(SetterExtensionBase):
         """Perform actions
         :param actions: a list of actions to perform"""
         pass
+
+    @property
+    @overrides(SetterExtensionBase)
+    def parameter_names(self):
+        return ['param_a', 'param_b']

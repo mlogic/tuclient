@@ -110,7 +110,7 @@ class MockTUGateway(object):
                 self._logger.error('Received a message with unsupported protocol version {ver}'.format(ver=req[0]))
                 continue
 
-            if req[2] == ProtocolCode_KEY:
+            if req[2] == ProtocolCode.KEY:
                 self._clients_status[client_id] = ClientStatus.HANDSHAKE1_AUTHENTICATING
                 self._clients_name[client_id] = req[5]
                 if self._cluster_name is None:
@@ -119,23 +119,23 @@ class MockTUGateway(object):
                     if self._cluster_name != req[4]:
                         raise RuntimeError('Client sent in wrong cluster name')
 
-                self._send_to_client(client_id, [ProtocolCode_OK])
+                self._send_to_client(client_id, [ProtocolCode.OK])
                 continue
 
             if client_id not in self._clients_status:
                 raise RuntimeError('Client {client_id} not authenticated. Exiting.'.
                                    format(client_id=client_id))
 
-            if req[2] == ProtocolCode_PI_PARAMETER_META:
+            if req[2] == ProtocolCode.PI_PARAMETER_META:
                 if self._clients_status[client_id] == ClientStatus.HANDSHAKE1_AUTHENTICATING:
                     self._clients_status[client_id] = ClientStatus.ALL_OK
-                    self._send_to_client(client_id, [ProtocolCode_OK])
+                    self._send_to_client(client_id, [ProtocolCode.OK])
                     continue
                 else:
-                    raise RuntimeError('Received ProtocolCode_PI_PARAMETER_META at the wrong time. Exiting.')
-            elif req[2] == ProtocolCode_CLUSTER_STATUS:
+                    raise RuntimeError('Received ProtocolCode.PI_PARAMETER_META at the wrong time. Exiting.')
+            elif req[2] == ProtocolCode.CLUSTER_STATUS:
                 requesting_client_id_in_hex_str = req[3]
-                self._send_to_client(client_id, [ProtocolCode_CLUSTER_STATUS_REPLY, requesting_client_id_in_hex_str,
+                self._send_to_client(client_id, [ProtocolCode.CLUSTER_STATUS_REPLY, requesting_client_id_in_hex_str,
                                                  self._cluster_name, self._cluster_status,
                                                  [(client_id.hex, self._clients_name[client_id], self._clients_status[client_id]) for client_id in self._clients_status.keys()]])
 

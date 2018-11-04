@@ -87,6 +87,36 @@ ClusterStatusToStrMapping = {
 }
 
 
+class ProtocolCode(Enum):
+    HEARTBEAT = 1
+    OK = 2
+    # Request status report from the client
+    CLIENT_STATUS = 3
+    ACTION = 4
+    ACTION_DONE = 5
+    PI = 6
+    PI_RECEIVED_OK = 7
+    # Reply from the client for the STATUS request
+    CLIENT_STATUS_REPLY = 8
+    CLUSTER_STATUS = 9
+    CLUSTER_STATUS_REPLY = 10
+    KEY = 11
+    PI_PARAMETER_META = 12
+    CLIENT_STOP = 13
+    WRONG_KEY = 20
+    BAD_MSG = 21
+    # Client hasn't authenticated properly
+    NOT_AUTH = 22
+    CLUSTER_NOT_CONFIGURED = 23
+
+    # Starting with 100 for easy debug
+    # Request the protocol to forward the payload to gateway
+    SEND = 100
+    PI_RECORD = 101
+    # Request to stop
+    EXIT = 102
+
+
 # Enum is not JSON serializable. IntEnum is, but in Python 3 only. So we write
 # our own Enum JSON Encoder and decoder.
 import json

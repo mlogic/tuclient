@@ -74,31 +74,6 @@ from .tulogging import *
 from uuid import *
 
 
-# We could have used IntEnum, but it wasn't JSON serializable in Python 2.7.
-# The problem for custom JSON Encoder is that you have to write one as_enum for each
-# module. We just use simple int instead.
-ProtocolCode_HEARTBEAT = 1
-ProtocolCode_OK = 2
-# Request status report from the client
-ProtocolCode_CLIENT_STATUS = 3
-ProtocolCode_ACTION = 4
-ProtocolCode_ACTION_DONE = 5
-ProtocolCode_PI = 6
-ProtocolCode_PI_RECEIVED_OK = 7
-# Reply from the client for the STATUS request
-ProtocolCode_CLIENT_STATUS_REPLY = 8
-ProtocolCode_CLUSTER_STATUS = 9
-ProtocolCode_CLUSTER_STATUS_REPLY = 10
-ProtocolCode_KEY = 11
-ProtocolCode_PI_PARAMETER_META = 12
-ProtocolCode_CLIENT_STOP = 13
-ProtocolCode_WRONG_KEY = 20
-ProtocolCode_BAD_MSG = 21
-# Client hasn't authenticated properly
-ProtocolCode_NOT_AUTH = 22
-ProtocolCode_CLUSTER_NOT_CONFIGURED = 23
-
-
 class TUClient:
     """The TuneUp.ai Client Class"""
     def __init__(self, logger, client_id, cluster_name, node_name, api_secret_key, protocol, getters, setters, network_timeout, tick_len=1, debugging_level=0):
@@ -194,7 +169,7 @@ class TUClient:
                     self._status = ClientStatus.HANDSHAKE1_AUTHENTICATING
                     # Handshake
                     self.timestamp_and_send_list(
-                        [ProtocolCode_KEY, self._api_secret_key, self._cluster_name, self._node_name])
+                        [ProtocolCode.KEY, self._api_secret_key, self._cluster_name, self._node_name])
                     # Reset the timeout counter after sending out a command
                     self._last_received_ts = monotonic_time()
                     current_error_msg = 'Failed to connect to the gateway'
@@ -223,7 +198,7 @@ class TUClient:
                             else:
                                 self._logger.info('Client node {node_name} collected from all getters: {pi_data}'
                                                   .format(node_name=self._node_name, pi_data=str(pi_data)))
-                                self.timestamp_and_send_list([ProtocolCode_PI, pi_data])
+                                self.timestamp_and_send_list([ProtocolCode.PI, pi_data])
                                 # We don't wait for 'OK' to save time
                         else:
                             pass
@@ -264,20 +239,20 @@ class TUClient:
                 # Remember to use 'continue' after successfully processing requests. Otherwise the default
                 # catch-all warning at the bottom will be triggered.
                 msg_code = msg[1]
-                if msg_code in (ProtocolCode_PI_RECEIVED_OK, ProtocolCode_HEARTBEAT):
+                if msg_code in (ProtocolCode.PI_RECEIVED_OK, ProtocolCode.HEARTBEAT):
                     continue
-                elif msg_code == ProtocolCode_BAD_MSG:
+                elif msg_code == ProtocolCode.BAD_MSG:
                     err_msg = 'Received BAD_MSG reply.'
                     if len(msg) >= 3:
                         err_msg = err_msg + ' ' + str(msg[2])
                     if current_error_msg is not None:
                         err_msg = current_error_msg + ' ' + err_msg
                     raise TUCommunicationError(err_msg)
-                elif msg_code == ProtocolCode_WRONG_KEY:
+                elif msg_code == ProtocolCode.WRONG_KEY:
                     if self._status == ClientStatus.HANDSHAKE1_AUTHENTICATING:
                         raise KeyError(current_error_msg + ' Please check API secret key. Exiting...')
                     # For all other status, the default catch all warning below will be issued
-                elif msg_code == ProtocolCode_OK:
+                elif msg_code == ProtocolCode.OK:
                     if self._status == ClientStatus.HANDSHAKE1_AUTHENTICATING:
                         self._status = ClientStatus.HANDSHAKE2_UPLOAD_METADATA
                         self._logger.info(
@@ -301,7 +276,7 @@ class TUClient:
                                     assert isinstance(setter.parameter_names, list)
                                     param_metadata += setter.parameter_names
 
-                        self.timestamp_and_send_list([ProtocolCode_PI_PARAMETER_META, pi_metadata, param_metadata])
+                        self.timestamp_and_send_list([ProtocolCode.PI_PARAMETER_META, pi_metadata, param_metadata])
                         # Reset the timeout counter after sending out a command
                         self._last_received_ts = monotonic_time()
                         current_error_msg = 'Failed to register PI and parameter metadata.'
@@ -313,26 +288,26 @@ class TUClient:
                                 node_name=self._node_name))
                         current_error_msg = None
                         continue
-                elif msg_code == ProtocolCode_ACTION:
+                elif msg_code == ProtocolCode.ACTION:
                     actions = msg[2]
                     self._logger.info('Performing action ' + str(actions))
                     for c in self._setters:
                         c.action(actions)
                     self._logger.info('Finished performing action.')
-                    self.timestamp_and_send_list([ProtocolCode_ACTION_DONE])
+                    self.timestamp_and_send_list([ProtocolCode.ACTION_DONE])
                     continue
-                elif msg_code == ProtocolCode_CLIENT_STATUS:
+                elif msg_code == ProtocolCode.CLIENT_STATUS:
                     # The ID of the client or CLI tool that was requesting the status report
                     requesting_client_id_in_hex_str = msg[2]
                     self._protocol.client_status_reply(requesting_client_id_in_hex_str, self._cluster_name, self._node_name,
                                                        self._status)
                     continue
-                elif msg_code == ProtocolCode_CLUSTER_STATUS:
+                elif msg_code == ProtocolCode.CLUSTER_STATUS:
                     # Query the cluster about its status
                     requesting_client_id_in_hex_str = msg[2]
-                    self.timestamp_and_send_list([ProtocolCode_CLUSTER_STATUS, requesting_client_id_in_hex_str])
+                    self.timestamp_and_send_list([ProtocolCode.CLUSTER_STATUS, requesting_client_id_in_hex_str])
                     continue
-                elif msg_code == ProtocolCode_CLUSTER_STATUS_REPLY:
+                elif msg_code == ProtocolCode.CLUSTER_STATUS_REPLY:
                     # The ID of the client or CLI tool that was requesting the status report
                     requesting_client_id_in_hex_str = msg[2]
                     cluster_name = msg[3]
@@ -341,7 +316,7 @@ class TUClient:
                     self._protocol.cluster_status_reply(requesting_client_id_in_hex_str, cluster_name, cluster_status,
                                                         client_list)
                     continue
-                elif msg_code == ProtocolCode_CLUSTER_NOT_CONFIGURED:
+                elif msg_code == ProtocolCode.CLUSTER_NOT_CONFIGURED:
                     self._logger.info('Cluster not configured yet')
                     continue
                 elif msg_code == 'DATALENWRONG':
@@ -349,7 +324,7 @@ class TUClient:
                                        .format(node_name=self._node_name))
                     self.stop()
                     continue
-                elif msg_code == ProtocolCode_NOT_AUTH:
+                elif msg_code == ProtocolCode.NOT_AUTH:
                     self._logger.error('Client node {node_name} not authenticated. Try reconnecting...'
                                        .format(node_name=self._node_name))
                     return
@@ -368,7 +343,7 @@ class TUClient:
                 self._logger.warning('Received unexpected message: {msg}. Client status: {status}.'.format(
                     msg=str(msg), status=str(self._status)))
 
-            self.timestamp_and_send_list([ProtocolCode_CLIENT_STOP])
+            self.timestamp_and_send_list([ProtocolCode.CLIENT_STOP])
             self._logger.info('Client node {node_name} stopped'.format(node_name=self._node_name))
         finally:
             self._status = ClientStatus.OFFLINE
