@@ -210,3 +210,9 @@ class ConfigBase(object):
         """Get the network timeout in seconds
         :return network timeout in sections"""
         return int(self.get_config()['network_timeout'])
+
+    def command_socket_address(self):
+        # type: () -> str
+        """Get the command socket address to listen on
+        :return the command socket address"""
+        return self.get_config()['command_socket_address']
