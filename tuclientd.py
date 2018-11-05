@@ -65,6 +65,10 @@ if __name__ == '__main__':
                             etc_dir=etc_dir))
     parser.add_argument('-p', '--pidfile', metavar='PIDFILE', type=str, nargs=1,
                         help='Override PID file name from the configuration file')
+    parser.add_argument('--command_socket_address', metavar='CMD_ADDR', type=str, nargs=1,
+                        help='Override the command socket address from the configuration file')
+    parser.add_argument('--log_file', metavar='LOG_FILE', type=str, nargs=1,
+                        help='Override the log file name from the configuration file')
     args = parser.parse_args()
     if args.conf is None:
         conffiles = [f for f in glob.glob(os.path.join(etc_dir, '*.conf')) if os.path.isfile(f)]
@@ -72,7 +76,10 @@ if __name__ == '__main__':
     else:
         conffiles = args.conf
     config = ConfigFile(None, 'client', socket.gethostname(), *conffiles)
-    logger = config.get_logger()
+    if args.log_file is None:
+        logger = config.get_logger()
+    else:
+        logger = tulogging.get_file_logger(args.log_file)
 
     # ID
     client_id = uuid1()
@@ -81,9 +88,11 @@ if __name__ == '__main__':
     api_secret_key = config.api_secret_key()
 
     # Protocol
+    cmd_socket_addr = config.command_socket_address() if args.command_socket_address is None \
+        else args.command_socket_address
     protocol_name = config.protocol()
     if protocol_name == 'zmq':
-        protocol = ZMQProtocol(logger, client_id, config.gateway_address())
+        protocol = ZMQProtocol(logger, client_id, config.gateway_address(), cmd_socket_addr=cmd_socket_addr)
     else:
         raise ValueError('Unsupported protocol ' + protocol_name)
     network_timeout = config.network_timeout()
