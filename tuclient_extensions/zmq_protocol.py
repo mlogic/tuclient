@@ -123,9 +123,9 @@ def _zmq_send_list(logger, sock, data, client_id=None):
                                                                           data=str(data)))
 
 
-def _zmq_timestamp_and_send_list(logger, sock, data, client_id=None):
+def zmq_send_to(logger, sock, data, client_id=None):
     # type: (logging.Logger, zmq.socket, List[Any], Optional[UUID]) -> None
-    """Send a list of data after prefixing a timestamp
+    """Send a list of data after prefixing a timestamp using a socket
 
     This function must only be called within the poller thread.
 
@@ -134,11 +134,13 @@ def _zmq_timestamp_and_send_list(logger, sock, data, client_id=None):
     _zmq_send_list(logger, sock, [time.time()] + data, client_id)
 
 
-def zmq_send_to(logger, target, data, wait_for_reply=False):
+def zmq_send_to_router(logger, target, data, wait_for_reply=False):
     # type: (logging.Logger, str, List[Any], bool) -> Optional[Any]
-    """Send a list of data using TU protocol
+    """Send a list of data to a router address using TU protocol
 
-    This function is thread-safe"""
+    A random UUID will be generated as client UUID.
+
+    This function is thread-safe."""
     context = None
     s = None
     try:
@@ -149,7 +151,7 @@ def zmq_send_to(logger, target, data, wait_for_reply=False):
         s.setsockopt(zmq.IDENTITY, tmp_uuid.bytes)
         s.setsockopt(zmq.SNDTIMEO, 1000)
         s.connect(target)
-        _zmq_timestamp_and_send_list(logger, s, data)
+        zmq_send_to(logger, s, data)
         if wait_for_reply:
             msg = zmq_poll_and_recv_message(logger, s)
             return msg[1:]
@@ -293,7 +295,7 @@ class ZMQProtocol(ProtocolExtensionBase):
                 elif msg[2] in (ProtocolCode.CLIENT_STATUS_REPLY, ProtocolCode.CLUSTER_STATUS_REPLY):
                     sending_to_client_id = UUID(hex=msg[3])
                     payload = msg[3:]
-                    _zmq_timestamp_and_send_list(self._logger, self._cmd_socket, payload, sending_to_client_id)
+                    zmq_send_to(self._logger, self._cmd_socket, payload, sending_to_client_id)
                 elif msg[2] == ProtocolCode.EXIT:
                     self._logger.info('Received exit command from {client_id}. Stopping poller loop...'.
                                       format(client_id=client_id))
@@ -307,7 +309,7 @@ class ZMQProtocol(ProtocolExtensionBase):
 
         The message is forwarded to the poller thread, which controls the ZMQContext
         and will do the actual sending, through the command socket."""
-        zmq_send_to(self._logger, self._cmd_socket_addr, [ProtocolCode.SEND] + data)
+        zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.SEND] + data)
 
     @overrides(ProtocolExtensionBase)
     def disconnect(self):
@@ -317,14 +319,14 @@ class ZMQProtocol(ProtocolExtensionBase):
         automatically upon exit. This method is NOT thread-safe but should be idempotent."""
         if self._poller_thread is not None:
             self._logger.info('Requesting poller to stop...')
-            zmq_send_to(self._logger, self._cmd_socket_addr, [ProtocolCode.EXIT])
+            zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.EXIT])
             self._poller_thread.join()
             self._poller_thread = None
 
     def client_status(self):
         # type: () -> Tuple[str, str, str, ClientStatus]
         """Query the client status through command socket"""
-        msg = zmq_send_to(self._logger, self._cmd_socket_addr, [ProtocolCode.CLIENT_STATUS], wait_for_reply=True)
+        msg = zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.CLIENT_STATUS], wait_for_reply=True)
         client_id_str = msg[1]
         cluster_name = msg[2]
         client_node_name = msg[3]
@@ -338,14 +340,14 @@ class ZMQProtocol(ProtocolExtensionBase):
 
         tuclient calls this function to send back a reply to the CLIENT_STATUS request to
         the client with client_id."""
-        zmq_send_to(self._logger, self._cmd_socket_addr, [ProtocolCode.CLIENT_STATUS_REPLY, client_id_in_hex_str,
-                                                          cluster_name, node_name, client_status], wait_for_reply=False)
+        zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.CLIENT_STATUS_REPLY, client_id_in_hex_str,
+                                                                 cluster_name, node_name, client_status], wait_for_reply=False)
 
     @overrides(ProtocolExtensionBase)
     def cluster_status(self):
         # type: () -> Tuple[str, ClusterStatus, List[str, str, ClientStatus]]
         """Query the client status through command socket"""
-        msg = zmq_send_to(self._logger, self._cmd_socket_addr, [ProtocolCode.CLUSTER_STATUS], wait_for_reply=True)
+        msg = zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.CLUSTER_STATUS], wait_for_reply=True)
         cluster_name = msg[2]
         cluster_status = msg[3]
         client_list = msg[4]
@@ -358,6 +360,6 @@ class ZMQProtocol(ProtocolExtensionBase):
 
         tuclient calls this function to send back a reply to the CLUSTER_STATUS request to
         the client with client_id."""
-        zmq_send_to(self._logger, self._cmd_socket_addr, [ProtocolCode.CLUSTER_STATUS_REPLY, client_id_in_hex_str,
-                                                          cluster_name, cluster_status, client_list],
-                    wait_for_reply=False)
+        zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.CLUSTER_STATUS_REPLY, client_id_in_hex_str,
+                                                                 cluster_name, cluster_status, client_list],
+                           wait_for_reply=False)
