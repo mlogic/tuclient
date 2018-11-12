@@ -108,24 +108,6 @@ class ConfigBase(object):
         """Return the location for storing daemons' stdout and stderr"""
         return self.get_config()['daemon_output_dir']
 
-    def db_type(self):
-        # type: () -> str
-        """Return the type of database as instructed by the config
-        :return: type of database
-        """
-        dbstr = self.get_config()['db']
-        colon_pos = dbstr.index(':')
-        return dbstr[:colon_pos]
-
-    def db_path(self):
-        # type: () -> str
-        """Return the path of DB as instructed by the config
-        :return: path to access the database
-        """
-        dbstr = self.get_config()['db']
-        colon_pos = dbstr.index(':')
-        return dbstr[colon_pos+1:]
-
     def gateway_address(self):
         # type: () -> str
         """Get the gateway address

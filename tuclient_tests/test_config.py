@@ -35,8 +35,6 @@ class TestConfig(unittest.TestCase):
         logger = logging.getLogger()
         logger.addHandler(logging.StreamHandler(sys.stdout))
         config = ConfigFile(logger, None, None, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file.ini', ))
-        self.assertEqual('mongodb', config.db_type())
-        self.assertEqual('/home/tsg/dbfile', config.db_path())
         # The values in this config file's [DEFAULT] section should overwrite the values
         # from the default config file.
         self.assertEqual('/var/log/my_tu_log_file', config.log_file())
