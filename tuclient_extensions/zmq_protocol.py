@@ -223,7 +223,7 @@ class ZMQProtocol(ProtocolExtensionBase):
         self._gateway_socket.setsockopt(zmq.IDENTITY, self._client_id.bytes)
         # Don't wait if there's any linger messages upon close.
         self._gateway_socket.setsockopt(zmq.LINGER, 0)
-        target = 'tcp://{gateway}'.format(gateway=self._gateway_address)
+        target = '{gateway}'.format(gateway=self._gateway_address)
         self._logger.info('Connecting to ' + target)
         self._gateway_socket.connect(target)
 
