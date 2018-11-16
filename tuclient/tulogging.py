@@ -92,22 +92,34 @@ def _logger_hasHandlers(logger):
     return rv
 
 
-def get_console_logger():
-    """Create or return the root logger that logs to stdout output
-
-    On first call, a root console logger is created, and the log level is set to WARN. On following calls, the
-    root logger is returned, and the log level won't be changed.
-
-    Exception will be risen if the root logger wasn't created as a console logger.
-    """
-    logger = logging.getLogger('console')
+def _get_stream_logger(name, stream):
+    """Get a stream logger"""
+    logger = logging.getLogger(name)
     if not _logger_hasHandlers(logger):
-        stderrhandler = logging.StreamHandler()
-        stderrhandler.setFormatter(logging.Formatter(FORMAT))
-        logger.addHandler(stderrhandler)
+        stream_handler = logging.StreamHandler(stream)
+        stream_handler.setFormatter(logging.Formatter(FORMAT))
+        logger.addHandler(stream_handler)
         logger.setLevel(logging.WARNING)
 
     return logger
+
+
+def get_console_logger():
+    """Get a logger that logs to stderr
+
+    The returned logger will have name "console", and multiple calls return the same
+    logger. Default log level is WARNING.
+    """
+    return _get_stream_logger('console', sys.stderr)
+
+
+def get_stdout_logger():
+    """Get a logger that logs to stdou
+
+    The returned logger will have name "stdout", and multiple calls return the same
+    logger. Default log level is WARNING.
+    """
+    return _get_stream_logger('stdout', sys.stdout)
 
 
 def flush_log():
