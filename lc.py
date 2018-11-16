@@ -29,7 +29,7 @@ from tuclient import ClientStatusToStrMapping, ClusterStatusToStrMapping, get_co
 from tuclient_extensions import ZMQProtocol
 from uuid import uuid1
 
-
+command_socket_address = 'tcp://127.0.0.1:7778'
 logger = get_console_logger()
 
 
@@ -37,7 +37,7 @@ def client_handler(sub_args):
     print(sub_args)
     if sub_args.status is not None:
         # Create a controller to talk to client1
-        client_controller = ZMQProtocol(logger, uuid1())
+        client_controller = ZMQProtocol(logger, uuid1(), cmd_socket_addr=command_socket_address)
         logger.info('Querying the status of the client running on the local machine...')
         client_id_str, cluster_name, client_node_name, client_status = client_controller.client_status()
         logger.info('Got the status reply')
@@ -50,7 +50,7 @@ def client_handler(sub_args):
 def cluster_handler(sub_args):
     if sub_args.status is not None:
         # Create a controller to talk to client1, which in turn talks to the cluster
-        client_controller = ZMQProtocol(logger, uuid1())
+        client_controller = ZMQProtocol(logger, uuid1(), cmd_socket_addr=command_socket_address)
         logger.info('Querying the status of the cluster...')
         cluster_name, cluster_status, client_list = client_controller.cluster_status()
         logger.info('Got the status reply')
@@ -70,6 +70,8 @@ def cluster_handler(sub_args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='TuneUp.ai Admin Tool')
     parser.add_argument('-v', '--verbose', action='store_true', help='enable verbose mode')
+    parser.add_argument('-s', '--command_socket_address', metavar='CMD_ADDR', type=str,
+                        help='The command socket address of the TUClient, default to ' + command_socket_address)
     subparsers = parser.add_subparsers(help='list of commands:', dest='command')
     subparsers.required = True
 
@@ -79,6 +81,7 @@ if __name__ == '__main__':
 
     parser_cluster = subparsers.add_parser('cluster', help='managing a cluster')
     parser_cluster.add_argument('status', help='Show the status of the cluster')
+    parser_cluster.add_argument('start_tuning', metavar='DESIRED_NODE_COUNT', help='Start tuning the cluster')
     parser_cluster.set_defaults(func=cluster_handler)
 
     if len(sys.argv) == 1:
@@ -89,4 +92,6 @@ if __name__ == '__main__':
         logger.setLevel(logging.DEBUG)
     else:
         logger.setLevel(logging.WARNING)
+    if args.command_socket_address is not None:
+        command_socket_address = args.command_socket_address
     args.func(args)
