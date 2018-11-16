@@ -290,9 +290,13 @@ class ZMQProtocol(ProtocolExtensionBase):
                     # msg[3] is already a ts. Don't add our own timestamp.
                     _zmq_send_list(self._logger, self._gateway_socket, msg[3:])
                 elif msg[2] in (ProtocolCode.CLIENT_STATUS, ProtocolCode.CLUSTER_STATUS):
-                    self._logger.debug('Status request received, sending to target queue...')
+                    self._logger.debug('Request {req} received, forwarding to target queue...'.format(req=str(msg[2])))
                     self._target_queue.put(msg[1:3] + [client_id.hex])
-                elif msg[2] in (ProtocolCode.CLIENT_STATUS_REPLY, ProtocolCode.CLUSTER_STATUS_REPLY):
+                elif msg[2] == ProtocolCode.START_TUNING:
+                    self._logger.debug('Request {req} received, forwarding to target queue...'.format(req=str(msg[2])))
+                    self._target_queue.put(msg[1:4] + [client_id.hex])
+                elif msg[2] in (ProtocolCode.CLIENT_STATUS_REPLY, ProtocolCode.CLUSTER_STATUS_REPLY,
+                                ProtocolCode.START_TUNING_REPLY):
                     sending_to_client_id = UUID(hex=msg[3])
                     payload = msg[3:]
                     zmq_send_to(self._logger, self._cmd_socket, payload, sending_to_client_id)
@@ -362,4 +366,32 @@ class ZMQProtocol(ProtocolExtensionBase):
         the client with client_id."""
         zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.CLUSTER_STATUS_REPLY, client_id_in_hex_str,
                                                                  cluster_name, cluster_status, client_list],
+                           wait_for_reply=False)
+
+    @overrides(ProtocolExtensionBase)
+    def cluster_start_tuning(self, desired_node_count):
+        # type: (int) -> int
+        """Instruct a cluster to start tuning
+
+        tuclient calls this function to instruct a cluster to start tuning when all desired nodes are online.
+
+        If the instruction was successful and the cluster has started tuning, returns desired_node_count.
+        Otherwise, return the node_count that the gateway has seen so far, which would be different
+        from the desired_node_count.
+
+        :param desired_node_count: desired number of nodes
+        :return: actual number of nodes"""
+        msg = zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.START_TUNING, desired_node_count],
+                                 wait_for_reply=True)
+        return msg[2]
+
+    @overrides(ProtocolExtensionBase)
+    def cluster_start_tuning_reply(self, client_id_in_hex_str, gateway_node_count):
+        # type: (str, int]) -> None
+        """Send a start_tuning reply to client_id_in_hex_str
+
+        tuclient calls this function to send back a reply to the START_TUNING request to
+        the client with client_id_in_hex_str."""
+        zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.START_TUNING_REPLY, client_id_in_hex_str,
+                                                                 gateway_node_count],
                            wait_for_reply=False)

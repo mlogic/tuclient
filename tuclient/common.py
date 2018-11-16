@@ -108,6 +108,9 @@ class ProtocolCode(Enum):
     # Client hasn't authenticated properly
     NOT_AUTH = 22
     CLUSTER_NOT_CONFIGURED = 23
+    START_TUNING = 24
+    # If START_TUNING did't send the correct node_count, tuning couldn't start
+    START_TUNING_REPLY = 25
 
     # Starting with 100 for easy debug
     # Request the protocol to forward the payload to gateway

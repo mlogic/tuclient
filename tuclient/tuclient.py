@@ -316,6 +316,18 @@ class TUClient:
                     self._protocol.cluster_status_reply(requesting_client_id_in_hex_str, cluster_name, cluster_status,
                                                         client_list)
                     continue
+                elif msg_code == ProtocolCode.START_TUNING:
+                    # A client (such as lc.py) has requested us to forward START_TUNING to gateway
+                    desired_node_count = msg[2]
+                    requesting_client_id_in_hex_str = msg[3]
+                    self.timestamp_and_send_list([ProtocolCode.START_TUNING, desired_node_count,
+                                                  requesting_client_id_in_hex_str])
+                    continue
+                elif msg_code == ProtocolCode.START_TUNING_REPLY:
+                    requesting_client_id_in_hex_str = msg[2]
+                    gateway_node_count = msg[3]
+                    self._protocol.cluster_start_tuning_reply(requesting_client_id_in_hex_str, gateway_node_count)
+                    continue
                 elif msg_code == ProtocolCode.CLUSTER_NOT_CONFIGURED:
                     self._logger.info('Cluster not configured yet')
                     continue

@@ -138,3 +138,27 @@ class ProtocolExtensionBase(object):
         :param cluster_status: status of the cluster
         :param client_list: list of known clients of the cluster as (client_id, client_name, client status)"""
         pass
+
+    @abc.abstractmethod
+    def cluster_start_tuning(self, desired_node_count):
+        # type: (int) -> int
+        """Instruct a cluster to start tuning
+
+        tuclient calls this function to instruct a cluster to start tuning when all desired nodes are online.
+
+        If the instruction was successful and the cluster has started tuning, returns desired_node_count.
+        Otherwise, return the node_count that the gateway has seen so far, which would be different
+        from the desired_node_count.
+
+        :param desired_node_count: desired number of nodes
+        :return: actual number of nodes"""
+        pass
+
+    @abc.abstractmethod
+    def cluster_start_tuning_reply(self, client_id_in_hex_str, gateway_node_count):
+        # type: (str, int]) -> None
+        """Send a start_tuning reply to client_id_in_hex_str
+
+        tuclient calls this function to send back a reply to the START_TUNING request to
+        the client with client_id_in_hex_str."""
+        pass
