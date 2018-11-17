@@ -34,7 +34,7 @@ import zmq
 class MockTUGateway(object):
     PROTOCOL_VER = 1
 
-    def __init__(self, logger, listen_on='127.0.0.1:7777'):
+    def __init__(self, logger, listen_on):
         self._logger = logger
         self._listen_on = listen_on
         self._cluster_name = None
@@ -88,7 +88,7 @@ class MockTUGateway(object):
     def _worker_loop(self):
         self._context = zmq.Context()
         self._socket = self._context.socket(zmq.ROUTER)
-        self._socket.bind('tcp://' + self._listen_on)
+        self._socket.bind(self._listen_on)
         self._logger.info('Listening on ' + self._listen_on)
         self._poller = zmq.Poller()
         self._poller.register(self._socket, zmq.POLLIN)

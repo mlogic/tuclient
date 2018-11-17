@@ -223,9 +223,8 @@ class ZMQProtocol(ProtocolExtensionBase):
         self._gateway_socket.setsockopt(zmq.IDENTITY, self._client_id.bytes)
         # Don't wait if there's any linger messages upon close.
         self._gateway_socket.setsockopt(zmq.LINGER, 0)
-        target = '{gateway}'.format(gateway=self._gateway_address)
-        self._logger.info('Connecting to ' + target)
-        self._gateway_socket.connect(target)
+        self._logger.info('Connecting to ' + self._gateway_address)
+        self._gateway_socket.connect(self._gateway_address)
 
         # We use ROUTER/DEALER for command socket so that we can have multiple incoming
         # connections.

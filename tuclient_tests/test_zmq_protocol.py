@@ -43,7 +43,7 @@ class TestZMQProtocol(unittest.TestCase):
         logger.addHandler(logging.StreamHandler(sys.stdout))
         logger.setLevel(logging.WARNING)
         client1_id = uuid1()
-        zp = ZMQProtocol(logger=logger, client_id=client1_id, gateway_address='127.0.0.1:7777')
+        zp = ZMQProtocol(logger=logger, client_id=client1_id, gateway_address='tcp://127.0.0.1:7777')
         msg_queue = Queue()
         zp.set_target_queue(msg_queue)
         # Must support start/stop for more than once
@@ -59,4 +59,3 @@ class TestZMQProtocol(unittest.TestCase):
             self.assertEqual(True, zp.started)
             zp.disconnect()
             self.assertEqual(False, zp.started)
-
