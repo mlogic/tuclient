@@ -39,7 +39,7 @@ class TestTUClient(unittest.TestCase):
         logger.addHandler(logging.StreamHandler(sys.stdout))
         logger.setLevel(logging.WARNING)
 
-        gateway_addr = '127.0.0.1:7777'
+        gateway_addr = 'tcp://127.0.0.1:7777'
         with MockTUGateway(logger, gateway_addr):
             client1_id = uuid1()
             cluster_name = 'test_cluster'
@@ -66,12 +66,12 @@ class TestTUClient(unittest.TestCase):
                 # Test the CLI tool, lc.py
                 try:
                     lc_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../lc.py')
-                    cp_str = run_shell_command(lc_path + ' client status')
+                    cp_str = run_shell_command(lc_path + ' client_status')
                     self.assertIn('Cluster name: test_cluster', cp_str)
                     self.assertIn('Client node name: client1', cp_str)
                     self.assertIn('status: Running', cp_str)
 
-                    cp_str = run_shell_command(lc_path + ' cluster status')
+                    cp_str = run_shell_command(lc_path + ' cluster_status')
                     self.assertIn('Cluster name: test_cluster', cp_str)
                     self.assertIn('Cluster status: Not setup', cp_str)
                     self.assertIn('List of client nodes', cp_str)
