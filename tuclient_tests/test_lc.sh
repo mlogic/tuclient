@@ -20,6 +20,6 @@ set -e -u
 
 cd `dirname $0`/..
 
-./lc.py 2>&1 | grep -q "managing a client"
+./lc.py 2>&1 | grep -q "query the status of a client"
 
 echo $0 PASS
