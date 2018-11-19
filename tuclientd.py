@@ -73,6 +73,7 @@ if __name__ == '__main__':
                         help='Override the node name from the configuration file')
     parser.add_argument('--api_key', metavar='API_KEY', type=str,
                         help='User\'s API key')
+    parser.add_argument('-v', '--verbose', action='store_true', help='enable verbose mode')
     args = parser.parse_args()
     if args.conf is None:
         conffiles = [f for f in glob.glob(os.path.join(etc_dir, '*.conf')) if os.path.isfile(f)]
@@ -84,6 +85,10 @@ if __name__ == '__main__':
         logger = config.get_logger()
     else:
         logger = tulogging.get_file_logger(args.log_file)
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.WARNING)
 
     # Configuration
     # These initial values are necessary if exception occurs in config.*()
@@ -143,6 +148,7 @@ if __name__ == '__main__':
 
         context.signal_map = {
             signal.SIGTERM: stop,
+            signal.SIGINT: stop,
             signal.SIGHUP: 'terminate',
             # signal.SIGUSR1: reload_program_config,
         }
