@@ -140,7 +140,10 @@ def zmq_send_to_router(logger, target, data, wait_for_reply=False):
 
     A random UUID will be generated as client UUID.
 
-    This function is thread-safe."""
+    This function is thread-safe.
+
+    TODO: This function doesn't generate an error when sending fails.
+    """
     context = None
     s = None
     try:
@@ -150,6 +153,11 @@ def zmq_send_to_router(logger, target, data, wait_for_reply=False):
         tmp_uuid = uuid1()
         s.setsockopt(zmq.IDENTITY, tmp_uuid.bytes)
         s.setsockopt(zmq.SNDTIMEO, 1000)
+        # Don't wait for more than 5s if there's any linger messages upon
+        # close. If it lingers forever (the default) this function may
+        # never be able to return if the other end is already closed.
+        s.setsockopt(zmq.LINGER, 5000)
+
         s.connect(target)
         zmq_send_to(logger, s, data)
         if wait_for_reply:
