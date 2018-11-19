@@ -29,45 +29,51 @@ from tuclient import ClientStatusToStrMapping, ClusterStatusToStrMapping, get_co
 from tuclient_extensions import ZMQProtocol
 from uuid import uuid1
 
-command_socket_address = 'tcp://127.0.0.1:7778'
 logger = get_console_logger()
+client_controller = None
 
 
-def client_handler(sub_args):
-    print(sub_args)
-    if sub_args.status is not None:
-        # Create a controller to talk to client1
-        client_controller = ZMQProtocol(logger, uuid1(), cmd_socket_addr=command_socket_address)
-        logger.info('Querying the status of the client running on the local machine...')
-        client_id_str, cluster_name, client_node_name, client_status = client_controller.client_status()
-        logger.info('Got the status reply')
-        print('Cluster name: ' + cluster_name)
-        print('Client node name: ' + client_node_name)
-        print('Client ID: ' + client_id_str)
-        print('Local client status: ' + ClientStatusToStrMapping[client_status])
+def client_status_handler(sub_args):
+    logger.info('Querying the status of the client running on the local machine...')
+    client_id_str, cluster_name, client_node_name, client_status = client_controller.client_status()
+    logger.info('Got the status reply')
+    print('Cluster name: ' + cluster_name)
+    print('Client node name: ' + client_node_name)
+    print('Client ID: ' + client_id_str)
+    print('Local client status: ' + ClientStatusToStrMapping[client_status])
 
 
-def cluster_handler(sub_args):
-    if sub_args.status is not None:
-        # Create a controller to talk to client1, which in turn talks to the cluster
-        client_controller = ZMQProtocol(logger, uuid1(), cmd_socket_addr=command_socket_address)
-        logger.info('Querying the status of the cluster...')
-        cluster_name, cluster_status, client_list = client_controller.cluster_status()
-        logger.info('Got the status reply')
-        print('Cluster name: ' + cluster_name)
-        print('Cluster status: ' + ClusterStatusToStrMapping[cluster_status])
-        print()
-        print('List of client nodes:')
-        print('==========================================')
-        for client_id, client_name, client_status in client_list:
-            print('{client_id:10},{client_name:30},{client_status}'.
-                  format(client_id=client_id, client_name=client_name,
-                         client_status=ClientStatusToStrMapping[client_status]))
-        print()
-        print('Total number of nodes: {num}'.format(num=len(client_list)))
+def cluster_status_handler(sub_args):
+    # The controller talks to client1, which in turn talks to the cluster
+    logger.info('Querying the status of the cluster...')
+    cluster_name, cluster_status, client_list = client_controller.cluster_status()
+    logger.info('Got the status reply')
+    print('Cluster name: ' + cluster_name)
+    print('Cluster status: ' + ClusterStatusToStrMapping[cluster_status])
+    print()
+    print('List of client nodes:')
+    print('==========================================')
+    for client_id, client_name, client_status in client_list:
+        print('{client_id:10},{client_name:30},{client_status}'.
+              format(client_id=client_id, client_name=client_name,
+                     client_status=ClientStatusToStrMapping[client_status]))
+    print()
+    print('Total number of nodes: {num}'.format(num=len(client_list)))
+
+
+def start_tuning_handler(sub_args):
+    logger.error('Sending request to the client...')
+    desired_node_count = sub_args.desired_node_count
+    gateway_node_count = client_controller.cluster_start_tuning(desired_node_count)
+    if gateway_node_count == desired_node_count:
+        logging.error('Tuning is started successfully.')
+    else:
+        logging.error("Tuning can't be started, because desired_node_count {desired_node_count} doesn't match gateway's actual node count {actual_node_count}".format(desired_node_count=desired_node_count, actual_node_count=actual_node_count))
+        exit(1)
 
 
 if __name__ == '__main__':
+    command_socket_address = 'tcp://127.0.0.1:7778'
     parser = argparse.ArgumentParser(description='TuneUp.ai Admin Tool')
     parser.add_argument('-v', '--verbose', action='store_true', help='enable verbose mode')
     parser.add_argument('-s', '--command_socket_address', metavar='CMD_ADDR', type=str,
@@ -75,14 +81,16 @@ if __name__ == '__main__':
     subparsers = parser.add_subparsers(help='list of commands:', dest='command')
     subparsers.required = True
 
-    parser_client = subparsers.add_parser('client', help='managing a client')
-    parser_client.add_argument('status', help='Show the status of clients')
-    parser_client.set_defaults(func=client_handler)
+    parser_client_status = subparsers.add_parser('client_status', help='query the status of a client')
+    parser_client_status.set_defaults(func=client_status_handler)
 
-    parser_cluster = subparsers.add_parser('cluster', help='managing a cluster')
-    parser_cluster.add_argument('status', help='Show the status of the cluster')
-    parser_cluster.add_argument('start_tuning', metavar='DESIRED_NODE_COUNT', help='Start tuning the cluster')
-    parser_cluster.set_defaults(func=cluster_handler)
+    parser_cluster_status = subparsers.add_parser('cluster_status', help='query the status of a cluster')
+    parser_cluster_status.set_defaults(func=cluster_status_handler)
+
+    parser_start_tuning = subparsers.add_parser('start_tuning', help='query the status of a cluster')
+    parser_start_tuning.add_argument('desired_node_count', metavar='DESIRED_NODE_COUNT', type=int,
+                                     help='the desired_node_count for start_tuning')
+    parser_start_tuning.set_defaults(func=start_tuning_handler)
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -94,4 +102,7 @@ if __name__ == '__main__':
         logger.setLevel(logging.WARNING)
     if args.command_socket_address is not None:
         command_socket_address = args.command_socket_address
+
+    client_controller = ZMQProtocol(logger, uuid1(), cmd_socket_addr=command_socket_address)
+
     args.func(args)
