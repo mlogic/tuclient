@@ -49,7 +49,7 @@ class ConfigBase(object):
 
         If a system_type is supplied, such as "gateway", "client", or "engine",
         configuration options for that specific system type override options
-        in the [general] section. Similarly, if a host name is supplied, the
+        in the [DEFAULT] section. Similarly, if a host name is supplied, the
         options under the section of that specific host name override other
         options.
 
