@@ -88,7 +88,7 @@ if __name__ == '__main__':
     if args.verbose:
         logger.setLevel(logging.DEBUG)
     else:
-        logger.setLevel(logging.WARNING)
+        logger.setLevel(logging.INFO)
 
     # Configuration
     # These initial values are necessary if exception occurs in config.*()

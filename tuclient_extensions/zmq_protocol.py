@@ -119,7 +119,7 @@ def _zmq_send_list(logger, sock, data, client_id=None):
     data = [ZMQProtocol.PROTOCOL_VER] + data
 
     sock.send(zlib.compress(json.dumps(data, cls=EnumEncoder).encode('utf8')))
-    logger.info('Message sent using socket {sock} at {ts}: {data}'.format(sock=str(sock), ts=time.time(),
+    logger.debug('Message sent using socket {sock} at {ts}: {data}'.format(sock=str(sock), ts=time.time(),
                                                                           data=str(data)))
 
 

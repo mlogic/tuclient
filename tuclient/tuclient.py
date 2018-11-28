@@ -193,10 +193,10 @@ class TUClient:
                                     pi_data.extend(d)
                             if len(pi_data) == 0:
                                 self._logger.info(
-                                    'Client node {node_name} no getter returns data. Skipped sending.'.format(
+                                    'Client node {node_name} getter returns no data. Skipped sending.'.format(
                                         node_name=self._node_name))
                             else:
-                                self._logger.info('Client node {node_name} collected from all getters: {pi_data}'
+                                self._logger.debug('Client node {node_name} collected from all getters: {pi_data}'
                                                   .format(node_name=self._node_name, pi_data=str(pi_data)))
                                 self.timestamp_and_send_list([ProtocolCode.PI, pi_data])
                                 # We don't wait for 'OK' to save time
@@ -290,10 +290,10 @@ class TUClient:
                         continue
                 elif msg_code == ProtocolCode.ACTION:
                     actions = msg[2]
-                    self._logger.info('Performing action ' + str(actions))
+                    self._logger.debug('Performing action ' + str(actions))
                     for c in self._setters:
                         c.action(actions)
-                    self._logger.info('Finished performing action.')
+                    self._logger.debug('Finished performing action.')
                     self.timestamp_and_send_list([ProtocolCode.ACTION_DONE])
                     continue
                 elif msg_code == ProtocolCode.CLIENT_STATUS:
