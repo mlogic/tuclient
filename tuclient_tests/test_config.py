@@ -47,18 +47,44 @@ class TestConfig(unittest.TestCase):
 
         config = ConfigFile(None, 'client', 'host_1', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file.ini', ))
         self.assertEqual('/var/log/tuclient_host_1/log', config.log_file())
+        self.assertEqual('tcp://10.0.0.1:8001', config.gateway_address())
         # client.host_1 doesn't logging_level, so the value in [client] should be used, not the value in [DEFAULT].
         self.assertEqual(logging.INFO, config.logging_level())
 
         # host_x doesn't exist
         config = ConfigFile(None, 'client', 'host_x', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file.ini', ))
         self.assertEqual('/var/log/tuclient/log', config.log_file())
+        self.assertEqual('tcp://10.0.0.1:8001', config.gateway_address())
         self.assertEqual(logging.INFO, config.logging_level())
+
+        # Test that you can use another ConfigBase as the default
+        overriding_config = ConfigFile(None, 'client', 'host_x',
+                                       os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                    'mock_conf_file_overriding.ini'),
+                                       default=config)
+        self.assertEqual('/var/log/tuclient/log_overriding', overriding_config.log_file())
+
+        # The overriding config file doesn't have a DEFAULT section, so we should get the log_file from
+        # 'config,' which uses the [client] section of 'mock_conf_file.ini'.
+        overriding_config = ConfigFile(None, None, None,
+                                       os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                    'mock_conf_file_overriding.ini'),
+                                       default=config)
+        self.assertEqual('/var/log/tuclient/log', overriding_config.log_file())
+
+        # Similar to above, but this time 'config' should not use the [client] section of
+        # 'mock_conf_file.ini', but the DEFAULT section.
+        config = ConfigFile(None, None, None, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file.ini', ))
+        overriding_config = ConfigFile(None, None, None,
+                                       os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                    'mock_conf_file_overriding.ini'),
+                                       default=config)
+        self.assertEqual('/var/log/my_tu_log_file', overriding_config.log_file())
 
     def test_multiple_conf_file(self):
         config = ConfigFile(None, 'client', None,
-                            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file.ini'),
-                            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_client_conf.ini'))
+                            [os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file.ini'),
+                             os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_client_conf.ini')])
         self.assertEqual('/tmp/test_tuclient_log.txt', config.log_file())
 
     def test_empty_config_file(self):

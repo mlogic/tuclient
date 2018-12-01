@@ -43,8 +43,8 @@ class ConfigBase(object):
         'NOTSET': logging.NOTSET,
     }
 
-    def __init__(self, logger=None, system_type=None, host_name=None):
-        # type: (Optional[logging.Logger], Optional[str], Optional[str]) -> None
+    def __init__(self, logger=None, system_type=None, host_name=None, default=None):
+        # type: (Optional[logging.Logger], Optional[str], Optional[str], Optional[ConfigBase]) -> None
         """Initialize a ConfigBase object
 
         If a system_type is supplied, such as "gateway", "client", or "engine",
@@ -71,9 +71,13 @@ class ConfigBase(object):
         if len(loaded_files) == 0:
             self.log(logging.WARNING, 'Failed to load default config file: ' + default_config_file)
             self._config = None
+            if default is not None:
+                self._config = default._config
         else:
             self.log(logging.DEBUG, 'Loaded default config file ' + str(loaded_files))
             self._config = cp.defaults()
+            if default is not None:
+                self._config.update(default._config)
 
     @abc.abstractmethod
     def get_config(self):

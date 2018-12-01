@@ -15,7 +15,7 @@
 # License along with this library; if not, see
 # https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
 from __future__ import absolute_import, division, print_function, unicode_literals
-from typing import Any, Optional
+from typing import List, Optional, Union
 
 __author__ = 'Yan Li'
 __copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
@@ -34,8 +34,8 @@ from .common import *
 
 
 class ConfigFile(ConfigBase):
-    def __init__(self, logger, system_type, host_name, *filenames):
-        # type: (Optional[logging.Logger], Optional[str], Optional[str], *str) -> None
+    def __init__(self, logger, system_type, host_name, filenames, default=None):
+        # type: (Optional[logging.Logger], Optional[str], Optional[str], Union[str, List[str]], Optional) -> None
         """Load a configuration file
 
         If a system_type is supplied, such as "gateway", "client", or "engine",
@@ -50,7 +50,7 @@ class ConfigFile(ConfigBase):
         :param system_type: the type of the system to read configuration for
         :param host_name: the host name of the system
         """
-        super(ConfigFile, self).__init__(logger, system_type, host_name)
+        super(ConfigFile, self).__init__(logger, system_type, host_name, default)
         # Parent's init should've loaded the default values in.
         cp = ConfigParser(defaults=self._config)
         self.loaded_files = cp.read(filenames)
