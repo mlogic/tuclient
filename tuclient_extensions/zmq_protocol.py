@@ -158,6 +158,7 @@ def zmq_send_to_router(logger, target, data, wait_for_reply=False):
         # never be able to return if the other end is already closed.
         s.setsockopt(zmq.LINGER, 5000)
 
+        logger.debug('Connecting to ' + target)
         s.connect(target)
         zmq_send_to(logger, s, data)
         if wait_for_reply:
