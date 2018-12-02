@@ -73,6 +73,8 @@ if __name__ == '__main__':
                         help='Override the node name from the configuration file')
     parser.add_argument('--api_key', metavar='API_KEY', type=str,
                         help='User\'s API key')
+    parser.add_argument('--gateway_addr', metavar='GATEWAY_ADDR', type=str,
+                        help='Override gateway address in config file')
     parser.add_argument('-v', '--verbose', action='store_true', help='enable verbose mode')
     args = parser.parse_args()
     if args.conf is None:
@@ -109,7 +111,9 @@ if __name__ == '__main__':
             else args.command_socket_address
         protocol_name = config.protocol()
         if protocol_name == 'zmq':
-            protocol = ZMQProtocol(logger, client_id, config.gateway_address(), cmd_socket_addr=cmd_socket_addr)
+            protocol = ZMQProtocol(logger, client_id,
+                                   args.gateway_addr if args.gateway_addr is not None else config.gateway_address(),
+                                   cmd_socket_addr=cmd_socket_addr)
         else:
             raise ValueError('Unsupported protocol ' + protocol_name)
         network_timeout = config.network_timeout()
