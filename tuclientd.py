@@ -82,7 +82,7 @@ if __name__ == '__main__':
         conffiles.sort()
     else:
         conffiles = args.conf
-    config = ConfigFile(None, 'client', socket.gethostname(), *conffiles)
+    config = ConfigFile(None, 'client', socket.gethostname(), conffiles)
     if args.log_file is None:
         logger = config.get_logger()
     else:
