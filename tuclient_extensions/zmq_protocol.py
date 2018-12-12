@@ -126,19 +126,23 @@ def _zmq_send_list(logger, sock, data, client_id=None):
                                                                           data=str(data)))
 
 
-def zmq_send_to(logger, sock, data, client_id=None):
+def zmq_send_to(logger, sock, data, client_id=None, ts=None):
     # type: (logging.Logger, zmq.socket, List[Any], Optional[UUID]) -> None
     """Send a list of data after prefixing a timestamp using a socket
 
     This function must only be called within the poller thread.
 
-    :param client_id: The UUID of the receiving client. If none, no UUID will be sent."""
+    :param client_id: The UUID of the receiving client. If none, no UUID will be sent.
+    :param ts: timestamp for the outgoing message, default to the current wall time
+    """
     assert isinstance(data, list), 'Wrong data type for send_list'
-    _zmq_send_list(logger, sock, [time.time()] + data, client_id)
+    if ts is None:
+        ts = time.time()
+    _zmq_send_list(logger, sock, [ts] + data, client_id)
 
 
 @static_vars(socket_dict=dict())
-def zmq_send_to_router(logger, target, data, wait_for_reply=False):
+def zmq_send_to_router(logger, target, data, wait_for_reply=False, ts=None):
     # type: (logging.Logger, str, List[Any], bool) -> Optional[Any]
     """Send a list of data to a router address using TU protocol
 
@@ -146,7 +150,8 @@ def zmq_send_to_router(logger, target, data, wait_for_reply=False):
 
     This function is thread-safe.
 
-    TODO: This function doesn't generate an error when sending fails.
+    TODO: Generate an error when sending fails.
+    :param ts: timestamp for the outgoing message, default to the current wall time
     """
     if target in zmq_send_to_router.socket_dict:
         s = zmq_send_to_router.socket_dict[target]
@@ -163,7 +168,7 @@ def zmq_send_to_router(logger, target, data, wait_for_reply=False):
         logger.debug('Connecting to ' + target)
         s.connect(target)
         zmq_send_to_router.socket_dict[target] = s
-    zmq_send_to(logger, s, data)
+    zmq_send_to(logger, s, data, ts=ts)
     if wait_for_reply:
         msg = zmq_poll_and_recv_message(logger, s)
         return msg[1:]

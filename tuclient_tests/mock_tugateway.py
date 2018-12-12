@@ -34,12 +34,14 @@ import zmq
 class MockTUGateway(object):
     PROTOCOL_VER = 1
 
-    def __init__(self, logger, listen_on):
+    def __init__(self, logger, listen_on, action_len=0):
         self._logger = logger
         self._listen_on = listen_on
         self._cluster_name = None
         self._cluster_status = ClusterStatus.NOT_SETUP
         self._stopped = False
+        self.do_an_action = False
+        self._action_len = action_len
         self._clients_status = dict()  # type: Dict[UUID, ClientStatus]
         self._clients_name = dict()    # type: Dict[UUID, str]
         self._thread = threading.Thread(target=self._thread_func)
@@ -49,7 +51,7 @@ class MockTUGateway(object):
         self.stop()
 
     def __enter__(self):
-        pass
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
@@ -96,6 +98,12 @@ class MockTUGateway(object):
 
         while not self._stopped:
             p = dict(self._poller.poll(100))
+
+            if self.do_an_action:
+                self.do_an_action = False
+                for client_id in self._clients_status.keys():
+                    self._send_to_client(client_id, [ProtocolCode.ACTION, [1.1] * self._action_len])
+
             if self._socket not in p:
                 continue
             client_id = UUID(bytes=self._socket.recv())

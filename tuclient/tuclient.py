@@ -92,6 +92,10 @@ class TUClient:
         self._client_id = client_id
         self._cluster_name = cluster_name
         self._node_name = node_name
+
+        _log_instance_name = '{cluster_name}.{node_name}'.format(cluster_name=cluster_name, node_name=node_name)
+        logger_set_formatter(logger, name=_log_instance_name)
+
         self._api_secret_key = api_secret_key
         self._msg_queue = Queue()
         self._protocol = protocol
@@ -103,9 +107,15 @@ class TUClient:
         self._getters = getters
         self._setters = setters
         self._tick_len = tick_len
+        self._logger.info('tick_len: {tick_len}'.format(tick_len=tick_len))
         self._setters = setters
         self._stopped = False
-        self._last_collect_time = 0
+        # Whether we should notify gateway about our stop. Used only in tests.
+        self.notify_gateway_on_stop = True
+        self._last_collect_monotonic_time = 0
+        # _last_collect_wall_time is initialized to -1 so that, if tick_len == 0, the first
+        # ts we use for sending the collected data will be 0.
+        self._last_collect_wall_time = -1
         self._collect_time_decimal = 0.5  # we always collect at the middle of a second
         # ts when we received last feedback from TUGateway or initiated connects, used for checking timeout.
         self._last_received_ts = 0
@@ -162,6 +172,9 @@ class TUClient:
         gc.disable()
         # Used by steps to customize error message
         current_error_msg = None
+        # Whether to force a collect step asap. Used when tick_len == 0.
+        if self._tick_len == 0:
+            force_collect = True
         try:
             self._logger.info('Client node {node_name} started'.format(node_name=self._node_name))
             while not self._stopped:
@@ -177,11 +190,33 @@ class TUClient:
 
                 if self._status == ClientStatus.ALL_OK:
                     if self._getters is not None and len(self._getters) > 0:
+                        # We need to collect at a fix time in a second (self._collect_time_decimal) by
+                        # the wall clock (so that the wall clock time will be saved to the database for
+                        # other analyses), but the second boundary of monotonic_time() is not aligned
+                        # with wall clock. That's why we need to calculate the diff between wall clock
+                        # and monotonic_time, and subtract that from self._collect_time_decimal.
+                        # We assume wall clock is always ahead of monotonic time.
+                        monotonic_time_wall_clock_diff = time.time() % 1 - monotonic_time() % 1
+                        if monotonic_time_wall_clock_diff < 0:
+                            monotonic_time_wall_clock_diff += 1
                         ts = monotonic_time()
-                        if ts - (self._last_collect_time + self._collect_time_decimal) >= self._tick_len - 0.01:
+                        # When self._tick_len > 0, we do a collect step periodically.
+                        # When self._tick_len == 0, we wait until force_collect.
+                        if (self._tick_len > 0 and
+                            ts - (self._last_collect_monotonic_time + (self._collect_time_decimal - monotonic_time_wall_clock_diff)) >= self._tick_len - 0.01) \
+                                or \
+                           (self._tick_len == 0 and force_collect):
                             # This must be updated *before* collecting to prevent the send time from
                             # slowly drifting away
-                            self._last_collect_time = int(ts)
+                            self._last_collect_monotonic_time = int(ts)
+                            if self._tick_len > 0:
+                                self._last_collect_wall_time = time.time()
+                            else:
+                                # When tick_len == 0, we have to use a increasing counter instead of
+                                # the read collect time to prevent collision.
+                                self._last_collect_wall_time += 1
+                            if self._tick_len == 0:
+                                force_collect = False
                             pi_data = []
                             for g in self._getters:
                                 d = g.collect()
@@ -197,17 +232,17 @@ class TUClient:
                                         node_name=self._node_name))
                             else:
                                 self._logger.debug('Client node {node_name} collected from all getters: {pi_data}'
-                                                  .format(node_name=self._node_name, pi_data=str(pi_data)))
-                                self.timestamp_and_send_list([ProtocolCode.PI, pi_data])
+                                                   .format(node_name=self._node_name, pi_data=str(pi_data)))
+                                self.timestamp_and_send_list([ProtocolCode.PI, pi_data],
+                                                             ts=self._last_collect_wall_time)
                                 # We don't wait for 'OK' to save time
                         else:
                             pass
                     else:
-                        self._last_collect_time = monotonic_time()
+                        self._last_collect_monotonic_time = monotonic_time()
 
                 gc.collect()
                 flush_log()
-                time.sleep(0)
 
                 # Print out memory usage every minute
                 if self._debugging_level >= 2 and int(time.time()) % 60 == 0:
@@ -216,8 +251,10 @@ class TUClient:
 
                 if self._status == ClientStatus.ALL_OK and self._getters is not None and len(self._getters) > 0:
                     # Calculate the precise time for next collection
-                    sleep_second = self._last_collect_time + self._collect_time_decimal + self._tick_len\
-                                   - monotonic_time()
+                    sleep_second = self._last_collect_monotonic_time + \
+                                   (self._collect_time_decimal - monotonic_time_wall_clock_diff) + \
+                                   self._tick_len - \
+                                   monotonic_time()
                     sleep_second = max(sleep_second, 0)
                 else:
                     sleep_second = 1
@@ -233,7 +270,8 @@ class TUClient:
                             err_msg = current_error_msg + ' ' + err_msg
                         raise TUTimeoutError(err_msg)
                     continue
-                self._logger.debug('Slept {0} seconds'.format(monotonic_time() - sleep_start_ts))
+                finally:
+                    self._logger.debug('Slept {0} seconds'.format(monotonic_time() - sleep_start_ts))
                 self._last_received_ts = monotonic_time()
 
                 # Remember to use 'continue' after successfully processing requests. Otherwise the default
@@ -295,6 +333,8 @@ class TUClient:
                         c.action(actions)
                     self._logger.debug('Finished performing action.')
                     self.timestamp_and_send_list([ProtocolCode.ACTION_DONE])
+                    if self._tick_len == 0:
+                        force_collect = True
                     continue
                 elif msg_code == ProtocolCode.CLIENT_STATUS:
                     # The ID of the client or CLI tool that was requesting the status report
@@ -340,12 +380,12 @@ class TUClient:
                     self._logger.error('Client node {node_name} not authenticated. Try reconnecting...'
                                        .format(node_name=self._node_name))
                     return
-                elif msg_code == 'BADPIDATA':
+                elif msg_code == ProtocolCode.BAD_PI_DATA:
                     self._logger.error('Client node {node_name} received bad PI data error. Exiting.'
                                        .format(node_name=self._node_name))
                     self.stop()
                     continue
-                elif msg_code == 'DUPLICATEDPIDATA':
+                elif msg_code == ProtocolCode.DUPLICATE_PI_DATA:
                     self._logger.error('Client node {node_name} received duplicate PI data error.'
                                        .format(node_name=self._node_name))
                     continue
@@ -355,7 +395,8 @@ class TUClient:
                 self._logger.warning('Received unexpected message: {msg}. Client status: {status}.'.format(
                     msg=str(msg), status=str(self._status)))
 
-            self.timestamp_and_send_list([ProtocolCode.CLIENT_STOP])
+            if self.notify_gateway_on_stop:
+                self.timestamp_and_send_list([ProtocolCode.CLIENT_STOP])
             self._logger.info('Client node {node_name} stopped'.format(node_name=self._node_name))
         finally:
             self._status = ClientStatus.OFFLINE
