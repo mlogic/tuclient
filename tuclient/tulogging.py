@@ -61,13 +61,14 @@ import io
 import logging
 import logging.handlers
 import os
+import socket
 import sys
 
 _STDOUT_LOGGER = 1
 _FILE_LOGGER = 2
 _MEMORY_LOGGER = 3
 
-FORMAT = "[%(asctime)s - %(filename)s:%(lineno)s - %(funcName)10s() ] %(message)s"
+DEFAULT_FORMAT = '%(asctime)s - {name} - %(filename)s:%(lineno)s - %(funcName)10s() - %(message)s'
 _log_file_handler = None
 _memory_handler = None
 memory_logger_stringio = None
@@ -97,29 +98,29 @@ def _get_stream_logger(name, stream):
     logger = logging.getLogger(name)
     if not _logger_hasHandlers(logger):
         stream_handler = logging.StreamHandler(stream)
-        stream_handler.setFormatter(logging.Formatter(FORMAT))
+        stream_handler.setFormatter(logging.Formatter(DEFAULT_FORMAT.format(name=name)))
         logger.addHandler(stream_handler)
         logger.setLevel(logging.WARNING)
 
     return logger
 
 
-def get_console_logger():
+def get_console_logger(name=socket.gethostname()):
     """Get a logger that logs to stderr
 
     The returned logger will have name "console", and multiple calls return the same
     logger. Default log level is WARNING.
     """
-    return _get_stream_logger('console', sys.stderr)
+    return _get_stream_logger(name, sys.stderr)
 
 
-def get_stdout_logger():
+def get_stdout_logger(name=socket.gethostname()):
     """Get a logger that logs to stdou
 
     The returned logger will have name "stdout", and multiple calls return the same
     logger. Default log level is WARNING.
     """
-    return _get_stream_logger('stdout', sys.stdout)
+    return _get_stream_logger(name, sys.stdout)
 
 
 def flush_log():
@@ -127,7 +128,7 @@ def flush_log():
         _memory_handler.flush()
 
 
-def get_file_logger(filename, lazy_flush=False):
+def get_file_logger(filename, lazy_flush=False, name=socket.gethostname()):
     """Create and return the root logger with a memory-cached file handler
 
     On first call, the root file logger is created, and the log level is set to WARN. On following calls, the
@@ -135,7 +136,7 @@ def get_file_logger(filename, lazy_flush=False):
 
     Exception will be risen if the root logger wasn't created as a file logger.
     """
-    logger = logging.getLogger('file')
+    logger = logging.getLogger(name)
     if not _logger_hasHandlers(logger):
         pathname = os.path.dirname(filename)
         if os.path.exists(pathname) and not os.path.isdir(pathname):
@@ -144,7 +145,7 @@ def get_file_logger(filename, lazy_flush=False):
             os.mkdir(pathname)
         global _log_file_handler
         _log_file_handler = logging.FileHandler(filename)
-        formatter = logging.Formatter(FORMAT)
+        formatter = logging.Formatter(DEFAULT_FORMAT.format(name=name))
         _log_file_handler.setFormatter(formatter)
 
         global _memory_handler
@@ -162,23 +163,31 @@ def get_file_logger(filename, lazy_flush=False):
     return logger
 
 
-def get_memory_logger():
+def get_memory_logger(name=socket.gethostname()):
     """Get a logger and stores all messages in memory and writes to stderr
 
     This memory logger keeps everything in memory and can use a huge amount of memory. Use it
     for test cases only.
 
     Use tulogging.memory_logger_stringio.getvalue() to get the log so far."""
-    logger = logging.getLogger('memory')
+    logger = logging.getLogger(name)
     if not _logger_hasHandlers(logger):
         global memory_logger_stringio
         memory_logger_stringio = io.StringIO()
         streamhandler = logging.StreamHandler(memory_logger_stringio)
-        streamhandler.setFormatter(logging.Formatter(FORMAT))
+        formatter = logging.Formatter(DEFAULT_FORMAT.format(name=name))
+        streamhandler.setFormatter(formatter)
         stderrhandler = logging.StreamHandler()
-        stderrhandler.setFormatter(logging.Formatter(FORMAT))
+        stderrhandler.setFormatter(formatter)
         logger.addHandler(streamhandler)
         logger.addHandler(stderrhandler)
         logger.setLevel(logging.WARNING)
 
     return logger
+
+
+def logger_set_formatter(logger, format=None, name=socket.gethostname()):
+    if format is None:
+        format = DEFAULT_FORMAT.format(name=name)
+    for handler in logger.handlers:
+        handler.setFormatter(logging.Formatter(format))
