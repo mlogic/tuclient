@@ -29,6 +29,9 @@ import zlib
 import zmq
 
 
+_context = zmq.Context()
+
+
 def zmq_recv_message(logger, sock, with_id):
     # type: (logging.Logger, zmq.socket, bool) -> List[Any]
     """Receive and verify a message from sock
@@ -57,7 +60,7 @@ def zmq_recv_message(logger, sock, with_id):
         # which cannot tell byte string and Unicode apart.
         data = data.decode('utf8')
         msg = json.loads(data, object_hook=as_enum)
-    except JSONDecodeError as err:
+    except (JSONDecodeError, zlib.error) as err:
         logger.error('Failed decoding a command message with error {err}: {data}'.format(
             err=err, data=str(data)))
         raise
@@ -134,6 +137,7 @@ def zmq_send_to(logger, sock, data, client_id=None):
     _zmq_send_list(logger, sock, [time.time()] + data, client_id)
 
 
+@static_vars(socket_dict=dict())
 def zmq_send_to_router(logger, target, data, wait_for_reply=False):
     # type: (logging.Logger, str, List[Any], bool) -> Optional[Any]
     """Send a list of data to a router address using TU protocol
@@ -144,11 +148,10 @@ def zmq_send_to_router(logger, target, data, wait_for_reply=False):
 
     TODO: This function doesn't generate an error when sending fails.
     """
-    context = None
-    s = None
-    try:
-        context = zmq.Context()
-        s = context.socket(zmq.DEALER)
+    if target in zmq_send_to_router.socket_dict:
+        s = zmq_send_to_router.socket_dict[target]
+    else:
+        s = _context.socket(zmq.DEALER)
         # http://api.zeromq.org/4-1:zmq-setsockopt#toc16
         tmp_uuid = uuid1()
         s.setsockopt(zmq.IDENTITY, tmp_uuid.bytes)
@@ -157,18 +160,13 @@ def zmq_send_to_router(logger, target, data, wait_for_reply=False):
         # close. If it lingers forever (the default) this function may
         # never be able to return if the other end is already closed.
         s.setsockopt(zmq.LINGER, 5000)
-
         logger.debug('Connecting to ' + target)
         s.connect(target)
-        zmq_send_to(logger, s, data)
-        if wait_for_reply:
-            msg = zmq_poll_and_recv_message(logger, s)
-            return msg[1:]
-    finally:
-        if s is not None:
-            s.close()
-        if context is not None:
-            context.destroy()
+        zmq_send_to_router.socket_dict[target] = s
+    zmq_send_to(logger, s, data)
+    if wait_for_reply:
+        msg = zmq_poll_and_recv_message(logger, s)
+        return msg[1:]
 
 
 class ZMQProtocol(ProtocolExtensionBase):
@@ -193,7 +191,6 @@ class ZMQProtocol(ProtocolExtensionBase):
         controller"""
         super(ZMQProtocol, self).__init__(logger, client_id)
         self._gateway_address = gateway_address
-        self._context = None         # type: Optional[zmq.Context]
         # The ZMQ socket for connecting to the gateway
         self._gateway_socket = None  # type: Optional[zmq.Socket]
         self._cmd_socket = None      # type: Optional[zmq.Socket]
@@ -211,7 +208,7 @@ class ZMQProtocol(ProtocolExtensionBase):
 
     def _poller_thread_func(self):
         # type: () -> None
-        # ZMQ context has to be initialized within the thread
+        # ZMQ sockets has to be initialized within the thread
         try:
             self._zmq_init()
             self._poller_loop()
@@ -225,9 +222,7 @@ class ZMQProtocol(ProtocolExtensionBase):
     def _zmq_init(self):
         # type: () -> None
         """Connect to gateway"""
-        if not self._context:
-            self._context = zmq.Context()
-        self._gateway_socket = self._context.socket(zmq.DEALER)
+        self._gateway_socket = _context.socket(zmq.DEALER)
         # http://api.zeromq.org/4-1:zmq-setsockopt#toc16
         self._gateway_socket.setsockopt(zmq.IDENTITY, self._client_id.bytes)
         # Don't wait if there's any linger messages upon close.
@@ -237,7 +232,7 @@ class ZMQProtocol(ProtocolExtensionBase):
 
         # We use ROUTER/DEALER for command socket so that we can have multiple incoming
         # connections.
-        self._cmd_socket = self._context.socket(zmq.ROUTER)
+        self._cmd_socket = _context.socket(zmq.ROUTER)
         self._cmd_socket.set_hwm(5000)
         self._logger.info('Binding to command socket ' + self._cmd_socket_addr)
         self._cmd_socket.bind(self._cmd_socket_addr)
@@ -259,9 +254,6 @@ class ZMQProtocol(ProtocolExtensionBase):
         if self._cmd_socket is not None:
             self._cmd_socket.close()
             self._cmd_socket = None
-        if self._context is not None:
-            self._context.destroy()
-            self._context = None
 
     @property
     @overrides(ProtocolExtensionBase)

@@ -111,6 +111,8 @@ class ProtocolCode(Enum):
     START_TUNING = 24
     # If START_TUNING did't send the correct node_count, tuning couldn't start
     START_TUNING_REPLY = 25
+    BAD_PI_DATA = 26
+    DUPLICATE_PI_DATA = 27
 
     # Starting with 100 for easy debug
     # Request the protocol to forward the payload to gateway
@@ -166,3 +168,12 @@ def run_shell_command(cmd):
         raise RuntimeError(err_msg)
 
     return cp_str
+
+
+# https://stackoverflow.com/a/279586/798778
+def static_vars(**kwargs):
+    def decorate(func):
+        for k in kwargs:
+            setattr(func, k, kwargs[k])
+        return func
+    return decorate
