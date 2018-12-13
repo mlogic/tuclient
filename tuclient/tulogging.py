@@ -71,7 +71,7 @@ _MEMORY_LOGGER = 3
 DEFAULT_FORMAT = '%(asctime)s - {name} - %(filename)s:%(lineno)s - %(funcName)10s() - %(message)s'
 _log_file_handler = None
 _memory_handler = None
-memory_logger_stringio = None
+memory_logger_stringios = dict()
 
 
 def _logger_hasHandlers(logger):
@@ -172,7 +172,6 @@ def get_memory_logger(name=socket.gethostname()):
     Use tulogging.memory_logger_stringio.getvalue() to get the log so far."""
     logger = logging.getLogger(name)
     if not _logger_hasHandlers(logger):
-        global memory_logger_stringio
         memory_logger_stringio = io.StringIO()
         streamhandler = logging.StreamHandler(memory_logger_stringio)
         formatter = logging.Formatter(DEFAULT_FORMAT.format(name=name))
@@ -182,6 +181,7 @@ def get_memory_logger(name=socket.gethostname()):
         logger.addHandler(streamhandler)
         logger.addHandler(stderrhandler)
         logger.setLevel(logging.WARNING)
+        memory_logger_stringios[name] = memory_logger_stringio
 
     return logger
 
