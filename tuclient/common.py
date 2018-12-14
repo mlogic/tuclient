@@ -46,16 +46,18 @@ from enum import Enum
 class ClientStatus(Enum):
     OFFLINE = 0
     ALL_OK = 1
-    NOT_SETUP = 2
-    HANDSHAKE1_AUTHENTICATING = 3
-    HANDSHAKE2_UPLOAD_METADATA = 4
-    CONNECTION_ERROR = 5
-    GETTER_ERROR = 6
-    SETTER_ERROR = 7
+    TUNING_PAUSED = 2
+    NOT_SETUP = 3
+    HANDSHAKE1_AUTHENTICATING = 4
+    HANDSHAKE2_UPLOAD_METADATA = 5
+    CONNECTION_ERROR = 6
+    GETTER_ERROR = 7
+    SETTER_ERROR = 8
 
 ClientStatusToStrMapping = {
     ClientStatus.OFFLINE: 'Offline',
     ClientStatus.ALL_OK: 'Running',
+    ClientStatus.TUNING_PAUSED: 'Tuning paused',
     ClientStatus.NOT_SETUP: 'Not setup',
     ClientStatus.HANDSHAKE1_AUTHENTICATING: 'Authenticating',
     ClientStatus.HANDSHAKE2_UPLOAD_METADATA: 'Syncing metadata',
@@ -110,9 +112,11 @@ class ProtocolCode(Enum):
     CLUSTER_NOT_CONFIGURED = 23
     START_TUNING = 24
     # If START_TUNING did't send the correct node_count, tuning couldn't start
-    START_TUNING_REPLY = 25
-    BAD_PI_DATA = 26
-    DUPLICATE_PI_DATA = 27
+    START_TUNING_FAILED = 25
+    # Notice to the client that tuning has started
+    START_TUNING_TO_CLIENT = 26
+    BAD_PI_DATA = 27
+    DUPLICATE_PI_DATA = 28
 
     # Starting with 100 for easy debug
     # Request the protocol to forward the payload to gateway

@@ -302,9 +302,9 @@ class ZMQProtocol(ProtocolExtensionBase):
                     self._logger.debug('Request {req} received, forwarding to target queue...'.format(req=str(msg[2])))
                     self._target_queue.put(msg[1:4] + [client_id.hex])
                 elif msg[2] in (ProtocolCode.CLIENT_STATUS_REPLY, ProtocolCode.CLUSTER_STATUS_REPLY,
-                                ProtocolCode.START_TUNING_REPLY):
+                                ProtocolCode.START_TUNING_TO_CLIENT, ProtocolCode.START_TUNING_FAILED):
                     sending_to_client_id = UUID(hex=msg[3])
-                    payload = msg[3:]
+                    payload = msg[2:]
                     zmq_send_to(self._logger, self._cmd_socket, payload, sending_to_client_id)
                 elif msg[2] == ProtocolCode.EXIT:
                     self._logger.info('Received exit command from {client_id}. Stopping poller loop...'.
@@ -337,10 +337,10 @@ class ZMQProtocol(ProtocolExtensionBase):
         # type: () -> Tuple[str, str, str, ClientStatus]
         """Query the client status through command socket"""
         msg = zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.CLIENT_STATUS], wait_for_reply=True)
-        client_id_str = msg[1]
-        cluster_name = msg[2]
-        client_node_name = msg[3]
-        client_status = msg[4]
+        client_id_str = msg[2]
+        cluster_name = msg[3]
+        client_node_name = msg[4]
+        client_status = msg[5]
         return client_id_str, cluster_name, client_node_name, client_status
 
     @overrides(ProtocolExtensionBase)
@@ -358,9 +358,9 @@ class ZMQProtocol(ProtocolExtensionBase):
         # type: () -> Tuple[str, ClusterStatus, List[str, str, ClientStatus]]
         """Query the client status through command socket"""
         msg = zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.CLUSTER_STATUS], wait_for_reply=True)
-        cluster_name = msg[2]
-        cluster_status = msg[3]
-        client_list = msg[4]
+        cluster_name = msg[3]
+        cluster_status = msg[4]
+        client_list = msg[5]
         return cluster_name, cluster_status, client_list
 
     @overrides(ProtocolExtensionBase)
@@ -376,7 +376,7 @@ class ZMQProtocol(ProtocolExtensionBase):
 
     @overrides(ProtocolExtensionBase)
     def cluster_start_tuning(self, desired_node_count):
-        # type: (int) -> int
+        # type: (int) -> List[ProtocolCode, int]
         """Instruct a cluster to start tuning
 
         tuclient calls this function to instruct a cluster to start tuning when all desired nodes are online.
@@ -386,18 +386,18 @@ class ZMQProtocol(ProtocolExtensionBase):
         from the desired_node_count.
 
         :param desired_node_count: desired number of nodes
-        :return: actual number of nodes"""
+        :return: result and actual number of nodes"""
         msg = zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.START_TUNING, desired_node_count],
                                  wait_for_reply=True)
-        return msg[2]
+        return msg[2:]
 
     @overrides(ProtocolExtensionBase)
-    def cluster_start_tuning_reply(self, client_id_in_hex_str, gateway_node_count):
-        # type: (str, int]) -> None
+    def cluster_start_tuning_reply(self, reply_protocol_code, client_id_in_hex_str, gateway_node_count):
+        # type: (ProtocolCode, str, int]) -> None
         """Send a start_tuning reply to client_id_in_hex_str
 
         tuclient calls this function to send back a reply to the START_TUNING request to
         the client with client_id_in_hex_str."""
-        zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.START_TUNING_REPLY, client_id_in_hex_str,
+        zmq_send_to_router(self._logger, self._cmd_socket_addr, [reply_protocol_code, client_id_in_hex_str,
                                                                  gateway_node_count],
                            wait_for_reply=False)

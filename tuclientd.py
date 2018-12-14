@@ -133,9 +133,9 @@ if __name__ == '__main__':
         if 'tick_len' in config.get_config():
             tuclient_kwargs['tick_len'] = config.tick_len()
 
-        client = TUClient(logger, client_id, cluster_name=cluster_name, node_name=node_name, api_secret_key=api_secret_key,
-                          protocol=protocol, getters=[getter], setters=[setter], network_timeout=network_timeout,
-                          **tuclient_kwargs)
+        client = TUClient(logger, client_id, cluster_name=cluster_name, node_name=node_name,
+                          api_secret_key=api_secret_key, protocol=protocol, getters=[getter], setters=[setter],
+                          network_timeout=network_timeout, sending_pi_right_away=False, **tuclient_kwargs)
 
         pidfile_name = args.pidfile if args.pidfile is not None else config.pidfile()
         # PIDLockFile(pidfile_name, timeout=-1) doesn't work for Python 2. We

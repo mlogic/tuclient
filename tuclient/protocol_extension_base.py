@@ -141,7 +141,7 @@ class ProtocolExtensionBase(object):
 
     @abc.abstractmethod
     def cluster_start_tuning(self, desired_node_count):
-        # type: (int) -> int
+        # type: (int) -> List[ProtocolCode, int]
         """Instruct a cluster to start tuning
 
         tuclient calls this function to instruct a cluster to start tuning when all desired nodes are online.
@@ -151,12 +151,12 @@ class ProtocolExtensionBase(object):
         from the desired_node_count.
 
         :param desired_node_count: desired number of nodes
-        :return: actual number of nodes"""
+        :return: result and actual number of nodes"""
         pass
 
     @abc.abstractmethod
-    def cluster_start_tuning_reply(self, client_id_in_hex_str, gateway_node_count):
-        # type: (str, int]) -> None
+    def cluster_start_tuning_reply(self, reply_protocol_code, client_id_in_hex_str, gateway_node_count):
+        # type: (ProtocolCode, str, int]) -> None
         """Send a start_tuning reply to client_id_in_hex_str
 
         tuclient calls this function to send back a reply to the START_TUNING request to

@@ -76,7 +76,8 @@ from uuid import *
 
 class TUClient:
     """The TuneUp.ai Client Class"""
-    def __init__(self, logger, client_id, cluster_name, node_name, api_secret_key, protocol, getters, setters, network_timeout, tick_len=1, debugging_level=0):
+    def __init__(self, logger, client_id, cluster_name, node_name, api_secret_key, protocol, getters, setters,
+                 network_timeout, tick_len=1, debugging_level=0, sending_pi_right_away=True):
         # type: (logging.Logger, UUID, str, str, str, ProtocolExtensionBase, Optional[List[GetterExtensionBase]], Optional[List[SetterExtensionBase]], int, int, int) -> None
         """ Create a TUClient instance
 
@@ -87,6 +88,7 @@ class TUClient:
         :param protocol: a ProtocolExtensionBase instance
         :param network_timeout: timeout before retrying connection
         :param debugging_level: 0: don't print debug info, 1: print debug info, 2: more debug info
+        :param sending_pi_right_away: start sending PI right away when started
         """
         self._logger = logger
         self._client_id = client_id
@@ -120,6 +122,7 @@ class TUClient:
         # ts when we received last feedback from TUGateway or initiated connects, used for checking timeout.
         self._last_received_ts = 0
         self._status = ClientStatus.OFFLINE
+        self._sending_pi_right_away = sending_pi_right_away
 
         # don't call protocol.connect() because start() may be called in a different process/thread
 
@@ -320,10 +323,15 @@ class TUClient:
                         current_error_msg = 'Failed to register PI and parameter metadata.'
                         continue
                     elif self._status == ClientStatus.HANDSHAKE2_UPLOAD_METADATA:
-                        self._status = ClientStatus.ALL_OK
                         self._logger.info(
                             'Client node {node_name} registered PI and Parameter metadata.'.format(
                                 node_name=self._node_name))
+                        if self._sending_pi_right_away:
+                            self._status = ClientStatus.ALL_OK
+                            self._logger.info('Tuning started right away')
+                        else:
+                            self._status = ClientStatus.TUNING_PAUSED
+                            self._logger.info('Tuning is paused. Waiting for START_TUNING_TO_CLIENT.')
                         current_error_msg = None
                         continue
                 elif msg_code == ProtocolCode.ACTION:
@@ -363,11 +371,25 @@ class TUClient:
                     self.timestamp_and_send_list([ProtocolCode.START_TUNING, desired_node_count,
                                                   requesting_client_id_in_hex_str])
                     continue
-                elif msg_code == ProtocolCode.START_TUNING_REPLY:
+                elif msg_code == ProtocolCode.START_TUNING_TO_CLIENT:
+                    # START_TUNING_TO_CLIENT could be of length 4 or 2, depending on whether it was sent
+                    # as a reply to a START_TUNING request or when the client registers to the gateway.
+                    if len(msg) == 4:
+                        requesting_client_id_in_hex_str = msg[2]
+                        gateway_node_count = msg[3]
+                        self._protocol.cluster_start_tuning_reply(msg_code, requesting_client_id_in_hex_str,
+                                                                  gateway_node_count)
+                    if self._status == ClientStatus.TUNING_PAUSED:
+                        self._status = ClientStatus.ALL_OK
+                        self._logger.info('Tuning started')
+                    else:
+                        self._sending_pi_right_away = True
+                        self._logger.warning('Received START_TUNING_TO_CLIENT when the client was not paused')
+                    continue
+                elif msg_code == ProtocolCode.START_TUNING_FAILED:
                     requesting_client_id_in_hex_str = msg[2]
                     gateway_node_count = msg[3]
-                    self._protocol.cluster_start_tuning_reply(requesting_client_id_in_hex_str, gateway_node_count)
-                    continue
+                    self._protocol.cluster_start_tuning_reply(msg_code, requesting_client_id_in_hex_str, gateway_node_count)
                 elif msg_code == ProtocolCode.CLUSTER_NOT_CONFIGURED:
                     self._logger.info('Cluster not configured yet')
                     continue

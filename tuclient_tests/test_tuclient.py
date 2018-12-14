@@ -108,7 +108,8 @@ class TestTUClient(unittest.TestCase):
 
             @property
             @overrides(SetterExtensionBase)
-            def parameter_names(self) -> List[str]:
+            def parameter_names(self):
+                # type: () -> List[str]
                 """Return the list of all parameters"""
                 return _MockSetter.mock_parameter_names
 
@@ -116,14 +117,16 @@ class TestTUClient(unittest.TestCase):
             mock_pi_names = ['pi1', 'pi2']
 
             @overrides(GetterExtensionBase)
-            def collect(self) -> List[float]:
+            def collect(self):
+                # type: () -> List[float]
                 global _total_collects
                 _total_collects += 1
                 return [1.1, 2.2]
 
             @property
             @overrides(GetterExtensionBase)
-            def pi_names(self) -> List[str]:
+            def pi_names(self):
+                # type: () -> List[str]
                 """Return the list of all parameters"""
                 return _MockGetter.mock_pi_names
 

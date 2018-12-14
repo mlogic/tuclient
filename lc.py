@@ -64,7 +64,7 @@ def cluster_status_handler(sub_args):
 def start_tuning_handler(sub_args):
     logger.error('Sending request to the client...')
     desired_node_count = sub_args.desired_node_count
-    gateway_node_count = client_controller.cluster_start_tuning(desired_node_count)
+    gateway_node_count = client_controller.cluster_start_tuning(desired_node_count)[1]
     if gateway_node_count == desired_node_count:
         logging.error('Tuning is started successfully.')
     else:
