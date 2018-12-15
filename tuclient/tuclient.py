@@ -114,7 +114,7 @@ class TUClient:
         self._stopped = False
         # Whether we should notify gateway about our stop. Used only in tests.
         self.notify_gateway_on_stop = True
-        self._last_collect_monotonic_time = 0
+        self._last_collect_time = 0
         # _last_collect_wall_time is initialized to -1 so that, if tick_len == 0, the first
         # ts we use for sending the collected data will be 0.
         self._last_collect_wall_time = -1
@@ -195,23 +195,23 @@ class TUClient:
                     if self._getters is not None and len(self._getters) > 0:
                         # We need to collect at a fix time in a second (self._collect_time_decimal) by
                         # the wall clock (so that the wall clock time will be saved to the database for
-                        # other analyses), but the second boundary of monotonic_time() is not aligned
-                        # with wall clock. That's why we need to calculate the diff between wall clock
-                        # and monotonic_time, and subtract that from self._collect_time_decimal.
-                        # We assume wall clock is always ahead of monotonic time.
-                        monotonic_time_wall_clock_diff = time.time() % 1 - monotonic_time() % 1
-                        if monotonic_time_wall_clock_diff < 0:
-                            monotonic_time_wall_clock_diff += 1
-                        ts = monotonic_time()
+                        # other analyses), so we don't use monotonic clock (we tried using monotonic
+                        # time with some complex calculation in the past but it was too buggy).
+                        ts = time.time()
+                        # Time backflow detection: because we are not using monotonic time, if the user
+                        # turns back the wall time, the program might not do collection in a long time.
+                        if self._last_collect_time - ts > self._tick_len:
+                            self._logger.info('Time was turned backwards. Doing a collection right now.')
+                            self._last_collect_time = 0
                         # When self._tick_len > 0, we do a collect step periodically.
                         # When self._tick_len == 0, we wait until force_collect.
                         if (self._tick_len > 0 and
-                            ts - (self._last_collect_monotonic_time + (self._collect_time_decimal - monotonic_time_wall_clock_diff)) >= self._tick_len - 0.01) \
+                            ts - (self._last_collect_time + self._collect_time_decimal) >= self._tick_len - 0.01) \
                                 or \
                            (self._tick_len == 0 and force_collect):
                             # This must be updated *before* collecting to prevent the send time from
                             # slowly drifting away
-                            self._last_collect_monotonic_time = int(ts)
+                            self._last_collect_time = int(ts)
                             if self._tick_len > 0:
                                 self._last_collect_wall_time = time.time()
                             else:
@@ -242,7 +242,7 @@ class TUClient:
                         else:
                             pass
                     else:
-                        self._last_collect_monotonic_time = monotonic_time()
+                        self._last_collect_time = time.time()
 
                 gc.collect()
                 flush_log()
@@ -254,10 +254,8 @@ class TUClient:
 
                 if self._status == ClientStatus.ALL_OK and self._getters is not None and len(self._getters) > 0:
                     # Calculate the precise time for next collection
-                    sleep_second = self._last_collect_monotonic_time + \
-                                   (self._collect_time_decimal - monotonic_time_wall_clock_diff) + \
-                                   self._tick_len - \
-                                   monotonic_time()
+                    sleep_second = self._last_collect_time + self._collect_time_decimal + self._tick_len - \
+                                   time.time()
                     sleep_second = max(sleep_second, 0)
                 else:
                     sleep_second = 1
