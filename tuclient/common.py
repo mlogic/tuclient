@@ -72,7 +72,6 @@ class ClusterStatus(Enum):
     TUNING_TARGET_REACHED = 32
     NOT_SETUP = 33       # This cluster hasn't been set up yet (desired cluster info not set)
     NODES_MISMATCH = 34  # One or more client node's information doesn't match desired information
-    NODES_LOST = 35
     TUNING_TARGET_NOT_REACHED = 36
     CLIENT_CONNECTION_ERROR = 37
     CLIENT_ERROR = 38
