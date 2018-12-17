@@ -90,24 +90,22 @@ def zmq_poll_and_recv_message(logger, sock, timeout=10):
         poller.register(sock, zmq.POLLIN)
 
         start_time = monotonic_time()
+        time_left = timeout
         while True:
-            time_left = timeout - (monotonic_time() - start_time)
-            if time_left < 0:
-                raise TUTimeoutError('Timeout, no message received')
             try:
                 p = dict(poller.poll(time_left*1000))
+                if sock in p:
+                    return zmq_recv_message(logger, sock, with_id=False)
             except zmq.ZMQError as e:
                 # This is a quirk of older zmq. The old version of pyzmq from EPEL throws out ZMQError
                 # when receiving a signal; the latest version of pyzmq doesn't.
-                if e.errno == errno.EINTR:
-                    # poll again
-                    continue
-                else:
+                if e.errno != errno.EINTR:
                     # other error, raise it
                     raise
 
-            if sock in p:
-                return zmq_recv_message(logger, sock, with_id=False)
+            time_left = timeout - (monotonic_time() - start_time)
+            if time_left < 0:
+                raise TUTimeoutError('Timeout, no message received')
     finally:
         if poller is not None:
             poller.unregister(sock)
