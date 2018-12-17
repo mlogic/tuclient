@@ -114,7 +114,6 @@ class TUClient:
         self._stopped = False
         # Whether we should notify gateway about our stop. Used only in tests.
         self.notify_gateway_on_stop = True
-        self._last_collect_time = 0
         # _last_collect_wall_time is initialized to -1 so that, if tick_len == 0, the first
         # ts we use for sending the collected data will be 0.
         self._last_collect_wall_time = -1
@@ -131,7 +130,7 @@ class TUClient:
         assert isinstance(data, list), 'Wrong data type for timestamp_and_send_list'
 
         # prefix it with the timestamp
-        if not ts:
+        if ts is None:
             ts = time.time()
         self._protocol.send_list([ts] + data)
         # Force a context switch
@@ -200,20 +199,19 @@ class TUClient:
                         ts = time.time()
                         # Time backflow detection: because we are not using monotonic time, if the user
                         # turns back the wall time, the program might not do collection in a long time.
-                        if self._last_collect_time - ts > self._tick_len:
+                        if self._last_collect_wall_time - ts > self._tick_len > 0:
                             self._logger.info('Time was turned backwards. Doing a collection right now.')
-                            self._last_collect_time = 0
+                            self._last_collect_wall_time = -1
                         # When self._tick_len > 0, we do a collect step periodically.
                         # When self._tick_len == 0, we wait until force_collect.
                         if (self._tick_len > 0 and
-                            ts - (self._last_collect_time + self._collect_time_decimal) >= self._tick_len - 0.01) \
+                            ts - (int(self._last_collect_wall_time) + self._collect_time_decimal) >= self._tick_len - 0.01) \
                                 or \
                            (self._tick_len == 0 and force_collect):
-                            # This must be updated *before* collecting to prevent the send time from
+                            # Last collect wall time must be updated *before* collecting to prevent the send time from
                             # slowly drifting away
-                            self._last_collect_time = int(ts)
                             if self._tick_len > 0:
-                                self._last_collect_wall_time = time.time()
+                                self._last_collect_wall_time = ts
                             else:
                                 # When tick_len == 0, we have to use a increasing counter instead of
                                 # the read collect time to prevent collision.
@@ -242,7 +240,7 @@ class TUClient:
                         else:
                             pass
                     else:
-                        self._last_collect_time = time.time()
+                        self._last_collect_wall_time = time.time()
 
                 gc.collect()
                 flush_log()
@@ -252,9 +250,10 @@ class TUClient:
                     print('Time: ' + time.asctime(time.localtime(time.time())))
                     tracker.print_diff()
 
-                if self._status == ClientStatus.ALL_OK and self._getters is not None and len(self._getters) > 0:
+                if self._status == ClientStatus.ALL_OK and self._getters is not None and len(self._getters) > 0 and \
+                        self._tick_len > 0:
                     # Calculate the precise time for next collection
-                    sleep_second = self._last_collect_time + self._collect_time_decimal + self._tick_len - \
+                    sleep_second = int(self._last_collect_wall_time) + self._collect_time_decimal + self._tick_len - \
                                    time.time()
                     sleep_second = max(sleep_second, 0)
                 else:
