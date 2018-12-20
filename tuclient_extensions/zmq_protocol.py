@@ -285,7 +285,8 @@ class ZMQProtocol(ProtocolExtensionBase):
                 try:
                     msg = zmq_recv_message(self._logger, self._gateway_socket, with_id=False)
                 except (ValueError, JSONDecodeError, TUCommunicationError) as err:
-                    self._logger.error(f'Receive message error: {type(err).__name__}: {str(err)}')
+                    self._logger.error('Receive message error: {type}: {msg}'.format(type=type(err).__name__,
+                                                                                     msg=str(err)))
                     continue
                 self._target_queue.put(msg[1:])
             elif self._cmd_socket in p:
