@@ -1,7 +1,7 @@
 #!/bin/bash
 # TuneUp.ai Client Daemon Control Script
 # 
-# Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
+# Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
 # All rights reserved.
 #
 # This library is free software; you can redistribute it and/or

@@ -1,5 +1,5 @@
 """Mock TUClient Extension class"""
-# Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
+# Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
 # All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
@@ -19,7 +19,7 @@ from typing import List
 from tuclient import *
 
 __author__ = 'Yan Li'
-__copyright__ = 'CONFIDENTIAL. Copyright (c) 2017-2018 Yan Li. All rights reserved.'
+__copyright__ = 'CONFIDENTIAL. Copyright (c) 2017-2019 Yan Li. All rights reserved.'
 __license__ = 'CONFIDENTIAL INFORMATION OF YAN LI'
 __docformat__ = 'reStructuredText'
 

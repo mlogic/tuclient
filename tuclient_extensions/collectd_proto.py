@@ -3,7 +3,7 @@
 Implements parsing incoming collectd parts according to
 https://collectd.org/wiki/index.php/Binary_protocol
 """
-# Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
+# Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
 # All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
@@ -21,7 +21,7 @@ https://collectd.org/wiki/index.php/Binary_protocol
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 __author__ = 'Yan Li'
-__copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
+__copyright__ = 'Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 

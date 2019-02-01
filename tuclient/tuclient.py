@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """TuneUp.ai Client"""
-# Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
+# Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
 # All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
@@ -52,7 +52,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from typing import Any, List, Optional, Tuple
 
 __author__ = 'Yan Li'
-__copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
+__copyright__ = 'Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
