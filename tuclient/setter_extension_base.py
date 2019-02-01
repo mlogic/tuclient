@@ -36,6 +36,11 @@ class SetterExtensionBase(object):
         self._config = config
 
     @abc.abstractmethod
+    def start(self):
+        """Notify the setter that initialization is done and collection will start soon"""
+        pass
+
+    @abc.abstractmethod
     def action(self, actions):
         # type: (List[float]) -> None
         """Perform actions
@@ -47,4 +52,9 @@ class SetterExtensionBase(object):
     def parameter_names(self):
         # type: () -> List[str]
         """Return the list of all parameters"""
+        pass
+
+    @abc.abstractmethod
+    def stop(self):
+        """Notify the setter that tuclient is shutting done"""
         pass

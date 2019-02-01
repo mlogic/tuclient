@@ -178,3 +178,7 @@ class TestTUClient(unittest.TestCase):
             finally:
                 client1.stop()
                 client1_thread.join()
+
+
+if __name__ == '__main__':
+    unittest.main()

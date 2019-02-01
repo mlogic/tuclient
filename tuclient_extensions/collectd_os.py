@@ -1,0 +1,182 @@
+"""Collects operating system information using collectd"""
+# Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
+# All rights reserved.
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License version 2.1 as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, see
+# https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+__author__ = 'Yan Li'
+__copyright__ = 'Copyright (c) 2017-2018 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
+__license__ = 'LGPLv2.1'
+__docformat__ = 'reStructuredText'
+
+from tuclient import *
+import tuclient_extensions.collectd_ext
+from tuclient_extensions import collectd_proto
+from typing import List
+
+
+class CollectdOS(GetterExtensionBase, SetterExtensionBase):
+    """Getter and Setter for using collectd to collect operating system information"""
+
+    def __init__(self, logger, config=None, collectd_instance=None):
+        """Create a CollectdOS instance
+
+        :param logger: logger
+        :param config: a ConfigBase instance for accessing configuration options
+        :param collectd_instance: a collectd_ext instance"""
+        super(CollectdOS, self).__init__(logger, config)
+        self._logger = logger
+        self._config = config
+        if collectd_instance is None:
+            self._collectd = tuclient_extensions.collectd_ext.get_collectd_ext_instance(logger)
+        else:
+            self._collectd = collectd_instance
+        self._collectd.add_plugin('cpu')
+        self._collectd.register_callback('cpu', self._on_receiving_cpu_data)
+
+        self._host = None
+        self._last_cpu_jiffies = None
+        self._last_cpu_jiffies_time = None
+        self._current_cpu_jiffies = dict()
+        self._current_cpu_jiffies_num_of_values = 0
+        # last_cpu_jiffies_diff stores the differences of jiffies between two collection periods
+        self._last_cpu_jiffies_diff = None
+        self._num_cpu = None
+        self._num_cpu_type_instances = None
+
+    def _on_receiving_cpu_data(self, host, plugin, parts):
+        assert plugin == 'cpu'
+        # Packets are separated by the Host part.
+        self._host = host
+        plugin_instance = None
+        ts = None
+        type = None
+        type_instance = None
+        # Number of values collected for the current period
+
+        self._logger.debug('Received parts: ' + str(parts))
+
+        for part_type, part_data in parts:
+            if part_type == tuclient_extensions.collectd_proto.PART_TYPE_TIME_HR:
+                assert isinstance(part_data, float)
+                ts = part_data
+                if self._last_cpu_jiffies_time is not None and ts - self._last_cpu_jiffies_time > 0.5:
+                    # Next collection period has began
+                    if self._last_cpu_jiffies is None:
+                        self._logger.debug('Finished receiving CPU jiffies of the first collection period')
+                        self._num_cpu = len(self._current_cpu_jiffies)
+                        self._num_cpu_type_instances = len(self._current_cpu_jiffies[1])
+                        self._last_cpu_jiffies = self._current_cpu_jiffies
+                        # Make sure all CPUs have the same number of type instances
+                        for _, v in self._current_cpu_jiffies.items():
+                            assert self._num_cpu_type_instances == len(v)
+                        # A new collection period has begin
+                            self._current_cpu_jiffies = dict()
+                        self._current_cpu_jiffies_num_of_values = 0
+                    else:
+                        # _current_cpu_jiffies should have already been processed
+                        assert len(self._current_cpu_jiffies) == 0
+                self._last_cpu_jiffies_time = ts
+
+            elif part_type == collectd_proto.PART_TYPE_PLUGIN_INSTANCE:
+                assert isinstance(part_data, str)
+                plugin_instance = int(part_data)
+            elif part_type == collectd_proto.PART_TYPE_TYPE:
+                assert isinstance(part_data, str)
+                type = part_data
+            elif part_type == collectd_proto.PART_TYPE_TYPE_INSTANCE:
+                assert isinstance(part_data, str)
+                type_instance = part_data
+            elif part_type == collectd_proto.PART_TYPE_VALUES:
+                if plugin != 'cpu':
+                    raise ValueError(f'Unknown plugin {plugin}')
+                assert len(part_data) == 1
+                assert part_data[0][0] == collectd_proto.DATA_TYPE_DERIVE
+                assert isinstance(part_data[0][1], int)
+                cpu_id = int(plugin_instance)
+                if cpu_id not in self._current_cpu_jiffies:
+                    self._current_cpu_jiffies[cpu_id] = dict()
+                # Data of the same type_instance shouldn't be received twice
+                assert type_instance not in self._current_cpu_jiffies[cpu_id]
+                self._current_cpu_jiffies[cpu_id][type_instance] = part_data[0][1]
+                self._current_cpu_jiffies_num_of_values += 1
+                if self._last_cpu_jiffies is not None and self._current_cpu_jiffies_num_of_values == \
+                        self._num_cpu * self._num_cpu_type_instances:
+                    # We've received all CPU values for this period. Calculate diffs between
+                    # current jiffies and previous jiffies.
+                    self._logger.debug('Finished receiving all values for current CPU jiffies')
+                    self._logger.debug(f'current_cpu_jiffies: {self._current_cpu_jiffies}')
+                    jiffies_diff = dict()
+                    for cpu_id in self._last_cpu_jiffies:
+                        jiffies_diff[cpu_id] = dict()
+                        for type_instance in self._last_cpu_jiffies[cpu_id]:
+                            jiffies_diff[cpu_id][type_instance] = self._current_cpu_jiffies[cpu_id][type_instance] - \
+                                                                  self._last_cpu_jiffies[cpu_id][type_instance]
+                    self._current_cpu_jiffies = dict()
+                    self._current_cpu_jiffies_num_of_values = 0
+                    # For thread-safety, we write to self._last_cpu_jiffies_diff last, which is being
+                    # monitored by collect() from another thread.
+                    self._last_cpu_jiffies_diff = jiffies_diff
+
+    @overrides(GetterExtensionBase)
+    def start(self):
+        self._collectd.start()
+
+    @overrides(GetterExtensionBase)
+    def collect(self):
+        # type: () -> List[float]
+        """Collect Performance Indicators"""
+        while self._last_cpu_jiffies_diff is None:
+            time.sleep(0.01)
+        # We have data from all plugins. Prepare to send them out.
+        outgoing_values = [0] * self._num_cpu * self._num_cpu_type_instances
+        i = 0
+        for cpu_id in sorted(self._last_cpu_jiffies_diff.keys()):
+            for type_instance in sorted(self._last_cpu_jiffies_diff[cpu_id].keys()):
+                outgoing_values[i] = self._last_cpu_jiffies_diff[cpu_id][type_instance]
+                i += 1
+        self._last_cpu_jiffies_diff = None
+        return outgoing_values
+
+    @property
+    @overrides(GetterExtensionBase)
+    def pi_names(self):
+        # type: () -> List[str]
+        """Return the list of all Performance Indicator names"""
+        while self._last_cpu_jiffies is None:
+            time.sleep(0.01)
+        pis = []
+        for cpu_id in sorted(self._last_cpu_jiffies.keys()):
+            for type_instance in sorted(self._last_cpu_jiffies[cpu_id].keys()):
+                pis.append(f'{self._host}/cpu/{cpu_id}/{type_instance}')
+        return pis
+
+    @overrides(SetterExtensionBase)
+    def action(self, actions):
+        # type: (List[float]) -> None
+        """Perform actions
+        :param actions: a list of actions to perform"""
+        pass
+
+    @property
+    @overrides(SetterExtensionBase)
+    def parameter_names(self):
+        # type: () -> List[str]
+        """Return the list of all parameters"""
+        pass
+
+    def stop(self):
+        if self._collectd is not None:
+            self._collectd.stop()

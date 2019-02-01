@@ -59,3 +59,7 @@ class TestZMQProtocol(unittest.TestCase):
             self.assertEqual(True, zp.started)
             zp.disconnect()
             self.assertEqual(False, zp.started)
+
+
+if __name__ == '__main__':
+    unittest.main()

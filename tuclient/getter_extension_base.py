@@ -36,6 +36,11 @@ class GetterExtensionBase(object):
         self._config = config
 
     @abc.abstractmethod
+    def start(self):
+        """Notify the getter that initialization is done and collection will start soon"""
+        pass
+
+    @abc.abstractmethod
     def collect(self):
         # type: () -> List[float]
         """Collect Performance Indicators"""
@@ -46,4 +51,9 @@ class GetterExtensionBase(object):
     def pi_names(self):
         # type: () -> List[str]
         """Return the list of all Performance Indicator names"""
+        pass
+
+    @abc.abstractmethod
+    def stop(self):
+        """Notify the getter that tuclient is shutting done"""
         pass
