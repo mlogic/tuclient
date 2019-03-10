@@ -72,18 +72,26 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
             if part_type == tuclient_extensions.collectd_proto.PART_TYPE_TIME_HR:
                 assert isinstance(part_data, float)
                 ts = part_data
-                if self._last_cpu_jiffies_time is not None and ts - self._last_cpu_jiffies_time > 0.5:
+                if self._last_cpu_jiffies_time is not None and ts - self._last_cpu_jiffies_time > 0.9:
                     # Next collection period has began
                     if self._last_cpu_jiffies is None:
-                        self._logger.debug('Finished receiving CPU jiffies of the first collection period')
-                        self._num_cpu = len(self._current_cpu_jiffies)
-                        self._num_cpu_type_instances = len(self._current_cpu_jiffies[1])
-                        self._last_cpu_jiffies = self._current_cpu_jiffies
-                        # Make sure all CPUs have the same number of type instances
+                        # Check if all CPUs have the same number of type instances
+                        # next(iter()) should be faster than list()[0]
+                        self._num_cpu_type_instances = len(next(iter(self._current_cpu_jiffies.values())))
                         for _, v in self._current_cpu_jiffies.items():
-                            assert self._num_cpu_type_instances == len(v)
-                        # A new collection period has begin
-                            self._current_cpu_jiffies = dict()
+                            if self._num_cpu_type_instances != len(v):
+                                # This could happen when what we receive is only the ending parts of
+                                # the first second. We should just ignore it.
+                                self._logger.debug(f'Received incomplete data for second {self._last_cpu_jiffies_time}, ignoring them.')
+                                self._num_cpu_type_instances = None
+                                break
+                        if self._num_cpu_type_instances is not None:
+                            self._logger.debug('Finished receiving CPU jiffies of the first collection period')
+                            self._num_cpu = len(self._current_cpu_jiffies)
+                            self._logger.debug(f'Number of CPU: {self._num_cpu}')
+                            self._logger.debug(f'Number of CPU type instances: {self._num_cpu_type_instances}')
+                            self._last_cpu_jiffies = self._current_cpu_jiffies
+                        self._current_cpu_jiffies = dict()
                         self._current_cpu_jiffies_num_of_values = 0
                     else:
                         # _current_cpu_jiffies should have already been processed
@@ -109,7 +117,8 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
                 if cpu_id not in self._current_cpu_jiffies:
                     self._current_cpu_jiffies[cpu_id] = dict()
                 # Data of the same type_instance shouldn't be received twice
-                assert type_instance not in self._current_cpu_jiffies[cpu_id]
+                if type_instance in self._current_cpu_jiffies[cpu_id]:
+                    raise ValueError(f'Error: type instance "{type_instance}" appeared twice for CPU {cpu_id}')
                 self._current_cpu_jiffies[cpu_id][type_instance] = part_data[0][1]
                 self._current_cpu_jiffies_num_of_values += 1
                 if self._last_cpu_jiffies is not None and self._current_cpu_jiffies_num_of_values == \
@@ -124,6 +133,7 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
                         for type_instance in self._last_cpu_jiffies[cpu_id]:
                             jiffies_diff[cpu_id][type_instance] = self._current_cpu_jiffies[cpu_id][type_instance] - \
                                                                   self._last_cpu_jiffies[cpu_id][type_instance]
+                    self._last_cpu_jiffies = self._current_cpu_jiffies
                     self._current_cpu_jiffies = dict()
                     self._current_cpu_jiffies_num_of_values = 0
                     # For thread-safety, we write to self._last_cpu_jiffies_diff last, which is being
