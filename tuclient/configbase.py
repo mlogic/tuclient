@@ -66,7 +66,7 @@ class ConfigBase(object):
 
         # Load default values
         cp = ConfigParser()
-        default_config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'default_conf_file.ini')
+        default_config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'default.conf')
         loaded_files = cp.read(default_config_file)
         if len(loaded_files) == 0:
             self.log(logging.WARNING, 'Failed to load default config file: ' + default_config_file)
@@ -124,7 +124,7 @@ class ConfigBase(object):
         :return: the logger
         """
         log_file = self.log_file()
-        if log_file == "":
+        if log_file is None or log_file == "":
             logger = get_console_logger()
         else:
             logger = get_file_logger(log_file)
@@ -139,7 +139,7 @@ class ConfigBase(object):
 
         :return: name of the log file
         """
-        return self.get_config()['log_file']
+        return self.get_config().get('log_file', None)
 
     def logging_level(self):
         # type: () -> int
@@ -180,10 +180,10 @@ class ConfigBase(object):
         return self.get_config()['setter_module']
 
     def pidfile(self):
-        # type: () -> str
+        # type: () -> Optional[str]
         """Get the location for storing PID file
         :return: path for storing the PID files"""
-        return self.get_config()['pidfile']
+        return self.get_config().get('pidfile', None)
 
     def tick_len(self):
         # type: () -> int

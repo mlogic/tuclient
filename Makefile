@@ -55,7 +55,7 @@ release-dir:
 release-cp: release-dir
 	cp -a AUTHORS COPYING README.rst $(VERSIONED_NAME)
 
-	cp -a lc.py Makefile setup.py tuclientd.py tuclient.service tuclient.spec \
+	cp -a tlc Makefile setup.py tuclientd.py tuclient.service tuclient.spec \
 		tuclient_daemon.sh $(VERSIONED_NAME)
 
 	cp -a tuclient tuclient_extensions tuclient_tests \
@@ -108,10 +108,10 @@ install: install-dirs
 
 	# binaries
 	$(call install_python_script,tuclientd.py,$(DESTDIR)/usr/sbin/tuclientd)
-	$(call install_python_script,lc.py,$(DESTDIR)/usr/sbin/lc)
+	$(call install_python_script,tlc,$(DESTDIR)/usr/sbin/lc)
 
 	# configuration files
-	install -Dpm 0644 tuclient/default_conf_file.ini $(DESTDIR)$(SYSCONFDIR)/tuclient/tuclient.conf
+	install -Dpm 0644 tuclient_daemon.conf $(DESTDIR)$(SYSCONFDIR)/tuclient/tuclient.conf
 
 	# systemd units
 	install -Dpm 0644 tuclient.service $(DESTDIR)$(UNITDIR)/tuclient.service
@@ -126,7 +126,7 @@ clean:
 test:
 	$(PYTHON) -m unittest discover tuclient_tests
 	tuclient_tests/test_tuclient_daemon.sh
-	tuclient_tests/test_lc.sh
+	tuclient_tests/test_tlc.sh
 
 func-test: test
 

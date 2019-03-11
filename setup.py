@@ -36,11 +36,14 @@ setup_requires = [
           'sphinx_rtd_theme',
       ]
 if sys.version_info[0] < 3:
-    setup_requires += ['enum','typing']
+    setup_requires += ['enum', 'typing']
 
 setup(name='tuclient',
       version='0.1',
-      packages=[],
+      packages=['tuclient', 'tuclient_extensions'],
+      scripts=['tlc', 'tuclientd.py'],
+      package_data={'tuclient': ['default.conf'],
+                    'tuclient_extensions': ['collectd_template.conf']},
       setup_requires=setup_requires,
       # Metadata for PyPI
       author='Yan Li',

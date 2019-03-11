@@ -3,11 +3,10 @@ Introduction
 
 This is the TuneUp.ai Client.
 
-* `_tuclient_daemon.sh` is the main script of the TUClient daemon.
-* `tuclient_daemon.sh` is used to start `_tuclient_daemon.sh` as a
-  service. This is useful for development and debugging. For
-  production, you should use a system-provided mechanism, such as
-  systemd, to start `_tuclient_daemon.sh` as a service.
+The client is usually installed as a system service, and you should
+use your system's service control mechanism to start and stop the
+client. For development or testing, you could use
+``tuclient_daemon.sh`` to start an instance of the client.
 
 Supported platforms
 ===================
@@ -18,6 +17,7 @@ run Python (version 2.7 and up).
 Currently, the following OSes are fully supported:
 
 * CentOS 7
+* Ubuntu 18.04 LTS, 18.10
 
 TuneUp.ai Client should also run on most Linux/Unix systems, prehaps
 with minor changes. If you manage to make it run on systems other than
@@ -32,3 +32,6 @@ directory (e.g. /usr/lib/python3.6/site-packages/) and shebangs in
 executable Python files are modified accordingly. This works well with
 virtualenvs. If you want tuned to use another Python, use ``make
 PYTHON=python_binary install``.
+
+``python setup.py {sdist|bdist}`` is also supported if you need to
+build Python source or binary packages.

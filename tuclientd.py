@@ -138,28 +138,33 @@ if __name__ == '__main__':
                           network_timeout=network_timeout, sending_pi_right_away=False, **tuclient_kwargs)
 
         pidfile_name = args.pidfile if args.pidfile is not None else config.pidfile()
-        # PIDLockFile(pidfile_name, timeout=-1) doesn't work for Python 2. We
-        # have to use the following:
-        pidfile = TimeoutPIDLockFile(pidfile_name, acquire_timeout=-1)
-        check_stale_lock(pidfile)
-        daemon_output_dir = config.daemon_output_dir()
-        context = daemon.DaemonContext(
-            # working_directory='/var/lib/foo',
-            pidfile=pidfile,
-            stdout=open(os.path.join(daemon_output_dir, 'tuclient_{name}_stdout'.format(name=node_name)), 'w+'),
-            stderr=open(os.path.join(daemon_output_dir, 'tuclient_{name}_stderr'.format(name=node_name)), 'w+'),
-        )
+        if pidfile_name is not None:
+            # If a pidfile is set, we start as a traditional daemon.
+            # PIDLockFile(pidfile_name, timeout=-1) doesn't work for Python 2. We
+            # have to use the following:
+            pidfile = TimeoutPIDLockFile(pidfile_name, acquire_timeout=-1)
+            check_stale_lock(pidfile)
+            daemon_output_dir = config.daemon_output_dir()
+            context = daemon.DaemonContext(
+                # working_directory='/var/lib/foo',
+                pidfile=pidfile,
+                stdout=open(os.path.join(daemon_output_dir, 'tuclient_{name}_stdout'.format(name=node_name)), 'w+'),
+                stderr=open(os.path.join(daemon_output_dir, 'tuclient_{name}_stderr'.format(name=node_name)), 'w+'),
+            )
 
-        context.signal_map = {
-            signal.SIGTERM: stop,
-            signal.SIGINT: stop,
-            signal.SIGHUP: 'terminate',
-            # signal.SIGUSR1: reload_program_config,
-        }
+            context.signal_map = {
+                signal.SIGTERM: stop,
+                signal.SIGINT: stop,
+                signal.SIGHUP: 'terminate',
+                # signal.SIGUSR1: reload_program_config,
+            }
 
-        context.files_preserve = [tulogging._log_file_handler.stream]
+            context.files_preserve = [tulogging._log_file_handler.stream]
 
-        with context:
+            with context:
+                client.start()
+        else:
+            # If a pidfile is not set, we start as a simple program.
             client.start()
     except Exception as err:
         logger.error('Client node {node_name} fatal error: {err_name}: {err}'
@@ -167,4 +172,3 @@ if __name__ == '__main__':
         logger.error(traceback.format_exc())
         # Don't continue on other errors
         exit(1)
-

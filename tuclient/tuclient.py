@@ -362,7 +362,7 @@ class TUClient:
                                                         client_list)
                     continue
                 elif msg_code == ProtocolCode.START_TUNING:
-                    # A client (such as lc.py) has requested us to forward START_TUNING to gateway
+                    # A client (such as tlc) has requested us to forward START_TUNING to gateway
                     desired_node_count = msg[2]
                     requesting_client_id_in_hex_str = msg[3]
                     self.timestamp_and_send_list([ProtocolCode.START_TUNING, desired_node_count,

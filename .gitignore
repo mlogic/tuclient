@@ -1,5 +1,9 @@
+*.egg-info
 *.tar.gz
+*.snap
 .mypy_cache
+build
 mock-result-dir
 rpm-build-dir
+snap
 tuclient-*.*.*

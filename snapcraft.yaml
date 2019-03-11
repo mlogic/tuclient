@@ -1,0 +1,33 @@
+name: tlc
+base: core18
+version: 0.2-git
+summary: TuneUp.ai Lightning Client
+description: |
+  This is the client of the fully automatic LightningCloud AI
+  Performance Tuning Service, which tunes up the performance of your
+  system by adjust parameters. The Client collects performance
+  indicators from your system, sends them to LightningCloud for
+  analysis, and sets system parameters according to LightningCloud's
+  instructions.
+
+grade: devel
+confinement: devmode
+
+parts:
+  tlc:
+    plugin: python
+    python-version: python3
+    source: .
+    stage-packages:
+      - collectd
+
+apps:
+  tlc:
+    command: tlc
+
+  tuclientd:
+    command: tuclientd.py
+    daemon: simple
+    plugs:
+      - network-bind
+    

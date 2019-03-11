@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unit tests for lc.py
+# Unit tests for tlc
 #
 # Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
 # All rights reserved.

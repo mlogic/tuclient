@@ -66,9 +66,9 @@ class TestTUClient(unittest.TestCase):
                         print('Timeout. Client1 failed to come online.')
                         os._exit(1)
 
-                # Test the CLI tool, lc.py
+                # Test the CLI tool, tlc
                 try:
-                    lc_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../lc.py')
+                    lc_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../tlc')
                     cp_str = run_shell_command(lc_path + ' client_status')
                     self.assertIn('Cluster name: test_cluster', cp_str)
                     self.assertIn('Client node name: client1', cp_str)
