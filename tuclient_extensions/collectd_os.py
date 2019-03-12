@@ -154,8 +154,10 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
         outgoing_values = [0] * self._num_cpu * self._num_cpu_type_instances
         i = 0
         for cpu_id in sorted(self._last_cpu_jiffies_diff.keys()):
+            half_total_jiffies = sum(self._last_cpu_jiffies_diff[cpu_id].values()) / 2
             for type_instance in sorted(self._last_cpu_jiffies_diff[cpu_id].keys()):
-                outgoing_values[i] = self._last_cpu_jiffies_diff[cpu_id][type_instance]
+                # Normalize to [-1, 1]
+                outgoing_values[i] = self._last_cpu_jiffies_diff[cpu_id][type_instance] / half_total_jiffies - 1
                 i += 1
         self._last_cpu_jiffies_diff = None
         return outgoing_values
