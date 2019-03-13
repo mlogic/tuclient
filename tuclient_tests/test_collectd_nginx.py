@@ -56,9 +56,8 @@ class TestCollectdNGINX(unittest.TestCase):
         using start_test_nginx_docker.sh."""
         collectd_nginx = None
         try:
-            mock_config = ConfigParser()
-            mock_config['DEFAULT'] = {'collectd_nginx_status_url':
-                                      'http://localhost:8080/status'}
+            mock_config = {'collectd_nginx_status_url':
+                           'http://localhost:8080/status'}
             collectd_nginx = CollectdNGINX(self._logger, 'host1', config=ConfigBase(default=mock_config))
             collectd_nginx.start()
             self.assertListEqual(['host1/nginx/connections_accepted', 'host1/nginx/connections_failed',
