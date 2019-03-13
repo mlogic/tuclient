@@ -141,7 +141,8 @@ class TestTUClient(unittest.TestCase):
             client1_node_name = 'client1'
             client1 = TUClient(logger, client1_id, cluster_name=cluster_name, node_name=client1_node_name,
                                api_secret_key='mock key', protocol=ZMQProtocol(logger, client1_id, gateway_addr),
-                               getters=[_MockGetter(logger, None)], setters=[_MockSetter(logger, None)],
+                               getters=[_MockGetter(logger, client1_node_name, None)],
+                               setters=[_MockSetter(logger, client1_node_name, None)],
                                network_timeout=5, tick_len=0)
             client1_thread = Thread(target=client1.start)
             client1_thread.start()

@@ -22,7 +22,6 @@ __copyright__ = 'Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
-import abc
 from configparser import ConfigParser
 import logging
 import os
@@ -30,8 +29,6 @@ from .tulogging import get_console_logger, get_file_logger
 
 
 class ConfigBase(object):
-    __metaclass__ = abc.ABCMeta
-
     NAME_TO_LEVEL = {
         'CRITICAL': logging.CRITICAL,
         'FATAL': logging.FATAL,
@@ -44,7 +41,7 @@ class ConfigBase(object):
     }
 
     def __init__(self, logger=None, system_type=None, host_name=None, default=None):
-        # type: (Optional[logging.Logger], Optional[str], Optional[str], Optional[ConfigBase]) -> None
+        # type: (Optional[logging.Logger], Optional[str], Optional[str], Optional) -> None
         """Initialize a ConfigBase object
 
         If a system_type is supplied, such as "gateway", "client", or "engine",
@@ -59,6 +56,8 @@ class ConfigBase(object):
                        None can be passed to disable logging.
         :param system_type: the type of the system to read configuration for
         :param host_name: the host name of the system
+        :param default: a SectionProxy or any dict-like object that provides
+                        default values
         """
         self._logger = logger
         self._system_type = system_type
@@ -72,14 +71,13 @@ class ConfigBase(object):
             self.log(logging.WARNING, 'Failed to load default config file: ' + default_config_file)
             self._config = None
             if default is not None:
-                self._config = default._config
+                self._config = default
         else:
             self.log(logging.DEBUG, 'Loaded default config file ' + str(loaded_files))
             self._config = cp.defaults()
             if default is not None:
-                self._config.update(default._config)
+                self._config.update(default)
 
-    @abc.abstractmethod
     def get_config(self):
         """Return a dict-like object for accessing the configuration values
 
@@ -87,7 +85,7 @@ class ConfigBase(object):
         the configuration if they exist. Use this dict for low-level access
         only.
         """
-        pass
+        return self._config
 
     def node_name(self):
         # type: () -> str

@@ -49,6 +49,8 @@ class ConfigFile(ConfigBase):
 
         :param system_type: the type of the system to read configuration for
         :param host_name: the host name of the system
+        :param default: a SectionProxy or any dict-like object that provides
+                        default values
         """
         super(ConfigFile, self).__init__(logger, system_type, host_name, default)
         # Parent's init should've loaded the default values in.
