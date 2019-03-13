@@ -30,9 +30,10 @@ import logging
 class SetterExtensionBase(object):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, logger, config):
-        # type: (logging.Logger, Optional[ConfigBase]) -> None
+    def __init__(self, logger, host, config):
+        # type: (logging.Logger, str, Optional[ConfigBase]) -> None
         self._logger = logger
+        self._host = host
         self._config = config
 
     @abc.abstractmethod

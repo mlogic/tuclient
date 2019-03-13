@@ -82,7 +82,8 @@ if __name__ == '__main__':
         conffiles.sort()
     else:
         conffiles = args.conf
-    config = ConfigFile(None, 'client', socket.gethostname(), conffiles)
+    host = socket.gethostname()
+    config = ConfigFile(None, 'client', host, conffiles)
     if args.log_file is None:
         logger = config.get_logger()
     else:
@@ -121,12 +122,12 @@ if __name__ == '__main__':
         # Setter module
         setter_module = importlib.import_module(config.setter_module())
         setter_class = getattr(setter_module, 'Setter')
-        setter = setter_class(logger, config)
+        setter = setter_class(logger, host, config)
 
         # Getter module
         getter_module = importlib.import_module(config.getter_module())
         getter_class = getattr(setter_module, 'Getter')
-        getter = getter_class(logger, config)
+        getter = getter_class(logger, host, config)
 
         # tick_len
         tuclient_kwargs = dict()

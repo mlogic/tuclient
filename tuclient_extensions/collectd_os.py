@@ -30,15 +30,13 @@ from typing import List
 class CollectdOS(GetterExtensionBase, SetterExtensionBase):
     """Getter and Setter for using collectd to collect operating system information"""
 
-    def __init__(self, logger, config=None, collectd_instance=None):
+    def __init__(self, logger, host, config=None, collectd_instance=None):
         """Create a CollectdOS instance
 
         :param logger: logger
         :param config: a ConfigBase instance for accessing configuration options
         :param collectd_instance: a collectd_ext instance"""
-        super(CollectdOS, self).__init__(logger, config)
-        self._logger = logger
-        self._config = config
+        super(CollectdOS, self).__init__(logger, host, config)
         if collectd_instance is None:
             self._collectd = tuclient_extensions.collectd_ext.get_collectd_ext_instance(logger)
         else:
@@ -46,7 +44,6 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
         self._collectd.add_plugin('cpu')
         self._collectd.register_callback('cpu', self._on_receiving_cpu_data)
 
-        self._host = None
         self._last_cpu_jiffies = None
         self._last_cpu_jiffies_time = None
         self._current_cpu_jiffies = dict()
@@ -58,8 +55,6 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
 
     def _on_receiving_cpu_data(self, host, plugin, parts):
         assert plugin == 'cpu'
-        # Packets are separated by the Host part.
-        self._host = host
         plugin_instance = None
         ts = None
         type = None
@@ -108,8 +103,6 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
                 assert isinstance(part_data, str)
                 type_instance = part_data
             elif part_type == collectd_proto.PART_TYPE_VALUES:
-                if plugin != 'cpu':
-                    raise ValueError(f'Unknown plugin {plugin}')
                 assert len(part_data) == 1
                 assert part_data[0][0] == collectd_proto.DATA_TYPE_DERIVE
                 assert isinstance(part_data[0][1], int)
@@ -187,7 +180,7 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
     def parameter_names(self):
         # type: () -> List[str]
         """Return the list of all parameters"""
-        pass
+        return []
 
     def stop(self):
         if self._collectd is not None:

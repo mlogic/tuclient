@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Unit tests for collectd_os plugin"""
+"""Unit tests for the collectd_os plugin"""
 # Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
 # All rights reserved.
 #
@@ -51,7 +51,7 @@ class TestCollectdOS(unittest.TestCase):
     def test_start_stop(self):
         collectd_os = None
         try:
-            collectd_os = CollectdOS(self._logger)
+            collectd_os = CollectdOS(self._logger, 'host_a')
             collectd_os.start()
             num_pis = len(collectd_os.pi_names)
             self.assertGreater(num_pis, 1)
@@ -63,7 +63,7 @@ class TestCollectdOS(unittest.TestCase):
     def test_parsing_data(self):
         collectd_os = None
         try:
-            collectd_os = CollectdOS(self._logger, collectd_instance=MockCollectd())
+            collectd_os = CollectdOS(self._logger, 'host_a', collectd_instance=MockCollectd())
             self._records_received = 0
             collectd_os.start()
             collectd_os._on_receiving_cpu_data('host_a', 'cpu',
@@ -305,8 +305,8 @@ class TestCollectdOS(unittest.TestCase):
                                  'host_a/cpu/6/user', 'host_a/cpu/6/wait', 'host_a/cpu/7/idle',
                                  'host_a/cpu/7/interrupt', 'host_a/cpu/7/nice', 'host_a/cpu/7/softirq',
                                  'host_a/cpu/7/steal', 'host_a/cpu/7/system', 'host_a/cpu/7/user', 'host_a/cpu/7/wait']
-            self.assertEqual(expected_pi_names, collectd_os.pi_names)
-            self.assertEqual(
+            self.assertListEqual(expected_pi_names, collectd_os.pi_names)
+            self.assertListEqual(
              [0.9795918367346939, -1.0, -1.0, -1.0, -1.0, -1.0, -0.9795918367346939, -1.0, 0.9603960396039604, -1.0,
               -1.0, -1.0, -1.0, -0.9603960396039604, -1.0, -1.0, 0.9801980198019802, -1.0, -1.0, -1.0, -1.0, -1.0,
               -0.9801980198019802, -1.0, 0.9595959595959596, -1.0, -0.9797979797979798, -1.0, -1.0, -1.0,
@@ -372,7 +372,7 @@ class TestCollectdOS(unittest.TestCase):
                                                 (8, 1552233784.7932975), (3, '0'), (5, 'steal'), (6, [(2, 0)]),
                                                 (8, 1552233784.7932758), (3, '5'),
                                                 (5, 'wait'), (6, [(2, 180)])])
-            self.assertEqual(
+            self.assertListEqual(
              [0.98, -1.0, -1.0, -1.0, -1.0, -1.0, -0.98, -1.0, 0.9797979797979799, -1.0, -1.0, -1.0, -1.0, -1.0,
               -0.9797979797979798, -1.0, 0.9595959595959596, -1.0, -1.0, -1.0, -1.0, -0.9797979797979798,
               -0.9797979797979798, -1.0, 0.9797979797979799, -1.0, -0.9797979797979798, -1.0, -1.0, -1.0, -1.0, -1.0,
@@ -466,7 +466,7 @@ class TestCollectdOS(unittest.TestCase):
                                                 (6, [(2, 0)]), (8, 1552233785.7929966),
                                                 (3, '4'), (6, [(2, 0)]), (8, 1552233785.7929838), (3, '0'),
                                                 (5, 'interrupt'), (6, [(2, 0)])])
-            self.assertEqual(
+            self.assertListEqual(
              [0.96, -1.0, -0.98, -0.98, -1.0, -1.0, -1.0, -1.0, 0.9199999999999999, -1.0, -1.0, -1.0, -1.0, -1.0, -0.92,
               -1.0, 0.9207920792079207, -1.0, -1.0, -1.0, -1.0, -0.9603960396039604, -0.9603960396039604, -1.0,
               0.9603960396039604, -1.0, -1.0, -1.0, -1.0, -0.9801980198019802, -0.9801980198019802, -1.0,
