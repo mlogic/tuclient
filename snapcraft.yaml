@@ -1,6 +1,6 @@
 name: tlc
 base: core18
-version: 0.2-git
+version: git
 summary: TuneUp.ai Lightning Client
 description: |
   This is the client of the fully automatic LightningCloud AI
@@ -18,6 +18,8 @@ parts:
     plugin: python
     python-version: python3
     source: .
+    requirements:
+      - requirements.txt
     stage-packages:
       - collectd
 

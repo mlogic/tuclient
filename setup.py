@@ -39,10 +39,10 @@ if sys.version_info[0] < 3:
     setup_requires += ['enum', 'typing']
 
 setup(name='tuclient',
-      version='0.1',
+      version='0.3',
       packages=['tuclient', 'tuclient_extensions'],
       scripts=['tlc', 'tuclientd.py'],
-      package_data={'tuclient': ['default.conf'],
+      package_data={'tuclient': ['default.conf', 'tuclient_daemon.conf', 'tuclient_snap.conf'],
                     'tuclient_extensions': ['collectd_template.conf']},
       setup_requires=setup_requires,
       # Metadata for PyPI

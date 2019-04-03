@@ -18,10 +18,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import argparse
-import daemon
-from daemon.pidfile import TimeoutPIDLockFile
 import importlib
-from lockfile.pidlockfile import PIDLockFile
 import glob
 import os
 import signal
@@ -58,7 +55,7 @@ def stop(signum, frame):
 
 
 if __name__ == '__main__':
-    etc_dir = '/etc/tuclient'
+    etc_dir = os.environ.get('SNAP_DATA', '/etc/tuclient')
     parser = argparse.ArgumentParser(description='TuneUp.ai Client daemon')
     parser.add_argument('-c', '--conf', metavar='CONF_FILE', type=str, nargs=1,
                         help='Configuration file (default to *.conf files in {etc_dir} in alphabetical order)'.format(
@@ -141,6 +138,10 @@ if __name__ == '__main__':
         pidfile_name = args.pidfile if args.pidfile is not None else config.pidfile()
         if pidfile_name is not None:
             # If a pidfile is set, we start as a traditional daemon.
+            import daemon
+            from daemon.pidfile import TimeoutPIDLockFile
+            from lockfile.pidlockfile import PIDLockFile
+
             # PIDLockFile(pidfile_name, timeout=-1) doesn't work for Python 2. We
             # have to use the following:
             pidfile = TimeoutPIDLockFile(pidfile_name, acquire_timeout=-1)

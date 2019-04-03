@@ -41,7 +41,7 @@
 
 Summary: TuneUp.ai Client
 Name: tuclient
-Version: 0.1.0
+Version: 0.3
 Release: 1%{?prerel1}%{?with_snapshot:.%{git_suffix}}%{?dist}
 License: LGPLv2.1
 Source0: %{name}-%{?prerel2}/%{name}-%{version}%{?prerel2}.tar.gz
@@ -127,12 +127,15 @@ fi
 %{_sbindir}/lc
 %{_sbindir}/tuclientd
 %dir %{_sysconfdir}/tuclient
-%config(noreplace) %{_sysconfdir}/tuclient/tuclient.conf
+%config(noreplace) %{_sysconfdir}/tuclient/tuclient_daemon.conf
 %{_unitdir}/tuclient.service
 %dir %{_localstatedir}/log/tuclient
 %dir /run/tuclient
 
 
 %changelog
+* Tue Mar 16 2019 Yan Li <yanli@tuneup.ai> 0.3-1
+- upstream release
+
 * Tue Sep 11 2018 Yan Li <yanli@tuneup.ai> 0.1-1
 - first release

@@ -111,7 +111,7 @@ install: install-dirs
 	$(call install_python_script,tlc,$(DESTDIR)/usr/sbin/lc)
 
 	# configuration files
-	install -Dpm 0644 tuclient_daemon.conf $(DESTDIR)$(SYSCONFDIR)/tuclient/tuclient.conf
+	install -Dpm 0644 tuclient_daemon.conf $(DESTDIR)$(SYSCONFDIR)/tuclient/tuclient_daemon.conf
 
 	# systemd units
 	install -Dpm 0644 tuclient.service $(DESTDIR)$(UNITDIR)/tuclient.service

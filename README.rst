@@ -16,8 +16,8 @@ run Python (version 2.7 and up).
 
 Currently, the following OSes are fully supported:
 
-* CentOS 7
-* Ubuntu 18.04 LTS, 18.10
+* CentOS 7 (RPM package)
+* Ubuntu 18.04 LTS, 18.10 (snap package)
 
 TuneUp.ai Client should also run on most Linux/Unix systems, prehaps
 with minor changes. If you manage to make it run on systems other than
@@ -35,3 +35,5 @@ PYTHON=python_binary install``.
 
 ``python setup.py {sdist|bdist}`` is also supported if you need to
 build Python source or binary packages.
+
+To build the snap package, run ``snapcraft``.

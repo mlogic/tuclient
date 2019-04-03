@@ -169,7 +169,7 @@ class TUClient:
             from pympler.tracker import SummaryTracker
             tracker = SummaryTracker()
 
-        # GC causes unplanned stall and disrupts precisely timed collection.
+        # GC could cause unplanned stall and disrupts precisely timed collection.
         # Disable it and do it manually before sleeping.
         gc.disable()
         # Used by steps to customize error message

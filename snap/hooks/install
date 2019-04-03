@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+set -eu
+
+# Create a default config file
+cp "$SNAP"/lib/python*/site-packages/tuclient/tuclient_snap.conf "$SNAP_DATA"
