@@ -29,3 +29,4 @@ from .protocol_extension_base import *
 from .setter_extension_base import SetterExtensionBase
 from .tulogging import *
 from .tuclient import *
+from .tuning_goal_calculator import TuningGoalCalculatorBase, TuningGoalCalculatorRegex, MockTuningGoalCalculator

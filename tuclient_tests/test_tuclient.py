@@ -49,7 +49,8 @@ class TestTUClient(unittest.TestCase):
             client1_node_name = 'client1'
             client1 = TUClient(logger, client1_id, cluster_name=cluster_name, node_name=client1_node_name,
                                api_secret_key='mock key', protocol=ZMQProtocol(logger, client1_id, gateway_addr),
-                               getters=[], setters=[], network_timeout=5)
+                               getters=[], setters=[], network_timeout=5, tuning_goal_name='Unused',
+                               tuning_goal_calculator=MockTuningGoalCalculator())
             client1_thread = Thread(target=client1.start)
             client1_thread.start()
             try:
@@ -121,7 +122,7 @@ class TestTUClient(unittest.TestCase):
                 # type: () -> List[float]
                 global _total_collects
                 _total_collects += 1
-                return [1.1, 2.2]
+                return [0.11, 0.22]
 
             @property
             @overrides(GetterExtensionBase)
@@ -143,7 +144,8 @@ class TestTUClient(unittest.TestCase):
                                api_secret_key='mock key', protocol=ZMQProtocol(logger, client1_id, gateway_addr),
                                getters=[_MockGetter(logger, client1_node_name, None)],
                                setters=[_MockSetter(logger, client1_node_name, None)],
-                               network_timeout=5, tick_len=0)
+                               network_timeout=5, tick_len=0, tuning_goal_name='Unused',
+                               tuning_goal_calculator=MockTuningGoalCalculator())
             client1_thread = Thread(target=client1.start)
             client1_thread.start()
             try:

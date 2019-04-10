@@ -15,7 +15,7 @@
 # License along with this library; if not, see
 # https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
 from __future__ import absolute_import, division, print_function, unicode_literals
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 __author__ = 'Yan Li'
 __copyright__ = 'Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
@@ -41,7 +41,7 @@ class ConfigBase(object):
     }
 
     def __init__(self, logger=None, system_type=None, host_name=None, default=None):
-        # type: (Optional[logging.Logger], Optional[str], Optional[str], Optional) -> None
+        # type: (Optional[logging.Logger], Optional[str], Optional[str], Optional[Iterable]) -> None
         """Initialize a ConfigBase object
 
         If a system_type is supplied, such as "gateway", "client", or "engine",
@@ -76,6 +76,8 @@ class ConfigBase(object):
             self.log(logging.DEBUG, 'Loaded default config file ' + str(loaded_files))
             self._config = cp.defaults()
             if default is not None:
+                # TODO
+                print(default)
                 self._config.update(default)
 
     def get_config(self):
@@ -200,3 +202,8 @@ class ConfigBase(object):
         """Get the command socket address to listen on
         :return the command socket address"""
         return self.get_config()['command_socket_address']
+
+    def tuning_goal_regex(self):
+        # type: () -> Optional[str]
+        """Return the tuning_goal_regex setting"""
+        return self.get_config().get('tuning_goal_regex', None)

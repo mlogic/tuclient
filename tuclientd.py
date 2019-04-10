@@ -21,6 +21,7 @@ import argparse
 import importlib
 import glob
 import os
+import re
 import signal
 import socket
 import sys
@@ -116,24 +117,45 @@ if __name__ == '__main__':
             raise ValueError('Unsupported protocol ' + protocol_name)
         network_timeout = config.network_timeout()
 
-        # Setter module
-        setter_module = importlib.import_module(config.setter_module())
-        setter_class = getattr(setter_module, 'Setter')
-        setter = setter_class(logger, host, config)
+        # Setter modules
+        setters = []   # type: List[SetterExtensionBase]
+        for setter_module_name in config.setter_module().split(', '):
+            setter_module = importlib.import_module(setter_module_name)
+            setter_class = getattr(setter_module, 'Setter')
+            setters.append(setter_class(logger, host, config))
 
-        # Getter module
-        getter_module = importlib.import_module(config.getter_module())
-        getter_class = getattr(setter_module, 'Getter')
-        getter = getter_class(logger, host, config)
+        # Getter modules
+        getters = []    # type: List[GetterExtensionBase]
+        for getter_module_name in config.getter_module().split(', '):
+            getter_module = importlib.import_module(getter_module_name)
+            getter_class = getattr(getter_module, 'Getter')
+            getters.append(getter_class(logger, host, config))
+
+        # Start the setters and getters once they are all created. This is necessary
+        # for collectd-related getters to get pi_names before we could create a
+        # TuningGoalCalculator below.
+        pi_names = []
+        for getter in getters:
+            getter.start()
+            pi_names += getter.pi_names
+        for i in setters:
+            i.start()
 
         # tick_len
         tuclient_kwargs = dict()
         if 'tick_len' in config.get_config():
             tuclient_kwargs['tick_len'] = config.tick_len()
 
+        # tuning_goal
+        tuning_goal_regex = config.tuning_goal_regex()
+        if tuning_goal_regex is None:
+            raise ValueError('tuning_goal_regex is not set.')
+
         client = TUClient(logger, client_id, cluster_name=cluster_name, node_name=node_name,
-                          api_secret_key=api_secret_key, protocol=protocol, getters=[getter], setters=[setter],
-                          network_timeout=network_timeout, sending_pi_right_away=False, **tuclient_kwargs)
+                          api_secret_key=api_secret_key, protocol=protocol, getters=getters, setters=setters,
+                          network_timeout=network_timeout, tuning_goal_name=tuning_goal_regex,
+                          tuning_goal_calculator=TuningGoalCalculatorRegex(logger, config, pi_names, tuning_goal_regex),
+                          sending_pi_right_away=False, **tuclient_kwargs)
 
         pidfile_name = args.pidfile if args.pidfile is not None else config.pidfile()
         if pidfile_name is not None:

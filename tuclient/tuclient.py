@@ -71,14 +71,15 @@ from threading import RLock
 import time
 import traceback
 from .tulogging import *
+from .tuning_goal_calculator import TuningGoalCalculatorBase
 from uuid import *
 
 
 class TUClient:
     """The TuneUp.ai Client Class"""
     def __init__(self, logger, client_id, cluster_name, node_name, api_secret_key, protocol, getters, setters,
-                 network_timeout, tick_len=1, debugging_level=0, sending_pi_right_away=True):
-        # type: (logging.Logger, UUID, str, str, str, ProtocolExtensionBase, Optional[List[GetterExtensionBase]], Optional[List[SetterExtensionBase]], int, int, int) -> None
+                 network_timeout, tuning_goal_name, tuning_goal_calculator, tick_len=1, debugging_level=0, sending_pi_right_away=True):
+        # type: (logging.Logger, UUID, str, str, str, ProtocolExtensionBase, Optional[List[GetterExtensionBase]], Optional[List[SetterExtensionBase]], int, str, TuningGoalCalculatorBase, int, int, bool) -> None
         """ Create a TUClient instance
 
         :param logger: a Logger instance
@@ -87,6 +88,8 @@ class TUClient:
         :param node_name: a string that uniquely identifies this client
         :param protocol: a ProtocolExtensionBase instance
         :param network_timeout: timeout before retrying connection
+        :param tuning_goal_name: name of tuning goal (reward)
+        :param tuning_goal_func: a callable for collecting reward
         :param debugging_level: 0: don't print debug info, 1: print debug info, 2: more debug info
         :param sending_pi_right_away: start sending PI right away when started
         """
@@ -108,6 +111,8 @@ class TUClient:
                                                                                 hostname=socket.gethostname()))
         self._getters = getters
         self._setters = setters
+        self._tuning_goal_name = tuning_goal_name
+        self._tuning_goal_calculator = tuning_goal_calculator
         self._tick_len = tick_len
         self._logger.info('tick_len: {tick_len}'.format(tick_len=tick_len))
         self._setters = setters
@@ -234,7 +239,14 @@ class TUClient:
                             else:
                                 self._logger.debug('Client node {node_name} collected from all getters: {pi_data}'
                                                    .format(node_name=self._node_name, pi_data=str(pi_data)))
-                                self.timestamp_and_send_list([ProtocolCode.PI, pi_data],
+
+                                tuning_goal = self._tuning_goal_calculator.get_tuning_goal(pi_data)
+                                assert -1 <= tuning_goal <= 1
+                                self._logger.debug('Client node {node_name} collected tuning goal: {tuning_goal}'
+                                                   .format(node_name=self._node_name, tuning_goal=str(tuning_goal)))
+
+                                # First element of the outgoing list is tuning_goal
+                                self.timestamp_and_send_list([ProtocolCode.PI, [tuning_goal] + pi_data],
                                                              ts=self._last_collect_wall_time)
                                 # We don't wait for 'OK' to save time
                         else:
@@ -299,8 +311,8 @@ class TUClient:
                             'Client node {node_name} handshake step 2: uploading PI and parameter metadata.'.
                             format(node_name=self._node_name))
                         # Send the PI and Parameter Metadata
-                        # Merge all PI names to one list
-                        pi_metadata = []
+                        # Merge all PI names to one list. First element is tuning_goal_name.
+                        pi_metadata = [self._tuning_goal_name]
                         if self._getters is not None:
                             for getter in self._getters:
                                 if getter.pi_names is not None:
