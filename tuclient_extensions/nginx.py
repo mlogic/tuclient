@@ -29,4 +29,3 @@ from tuclient_extensions import get_pids
 def reload_nginx_config_file():
     for pid in get_pids('bin/nginx'):
         os.kill(pid, signal.SIGUSR1)
-

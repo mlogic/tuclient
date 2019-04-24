@@ -27,12 +27,14 @@ from tuclient_extensions.setter_misc import *
 import unittest
 
 
-class TestConfig(unittest.TestCase):
+class TestSetterMisc(unittest.TestCase):
+    # We used to test get_pids() by letting it retrieve the PID of "sbin/init",
+    # but that didn't run inside our builder Docker container.
     def test_get_pids(self):
-        self.assertListEqual([1], get_pids('/sbin/init'))
+        self.assertTrue(os.getpid() in get_pids('python'))
 
     def test_get_proc_cmdline(self):
-        self.assertTrue('/init' in get_proc_cmdline(1))
+        self.assertTrue('python' in get_proc_cmdline(os.getpid()))
 
 
 if __name__ == '__main__':
