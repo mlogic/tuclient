@@ -77,14 +77,16 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
                             if self._num_cpu_type_instances != len(v):
                                 # This could happen when what we receive is only the ending parts of
                                 # the first second. We should just ignore it.
-                                self._logger.debug(f'Received incomplete data for second {self._last_cpu_jiffies_time}, ignoring them.')
+                                self._logger.debug('Received incomplete data for second {}, ignoring them.'.format(
+                                    self._last_cpu_jiffies_time
+                                ))
                                 self._num_cpu_type_instances = None
                                 break
                         if self._num_cpu_type_instances is not None:
                             self._logger.debug('Finished receiving CPU jiffies of the first collection period')
                             self._num_cpu = len(self._current_cpu_jiffies)
-                            self._logger.debug(f'Number of CPU: {self._num_cpu}')
-                            self._logger.debug(f'Number of CPU type instances: {self._num_cpu_type_instances}')
+                            self._logger.debug('Number of CPU: {}'.format(self._num_cpu))
+                            self._logger.debug('Number of CPU type instances: {}'.format(self._num_cpu_type_instances))
                             self._last_cpu_jiffies = self._current_cpu_jiffies
                         self._current_cpu_jiffies = dict()
                         self._current_cpu_jiffies_num_of_values = 0
@@ -111,7 +113,11 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
                     self._current_cpu_jiffies[cpu_id] = dict()
                 # Data of the same type_instance shouldn't be received twice
                 if type_instance in self._current_cpu_jiffies[cpu_id]:
-                    raise ValueError(f'Error: type instance "{type_instance}" appeared twice for CPU {cpu_id}')
+                    err_msg = 'Error: type instance "{type_instance}" appeared twice for CPU {cpu_id} at time {ts}'\
+                        .format(type_instance=type_instance, cpu_id=cpu_id, ts=ts)
+                    self._logger.error(err_msg)
+                    self._logger.error('Received parts: ' + str(parts))
+                    raise ValueError(err_msg)
                 self._current_cpu_jiffies[cpu_id][type_instance] = part_data[0][1]
                 self._current_cpu_jiffies_num_of_values += 1
                 if self._last_cpu_jiffies is not None and self._current_cpu_jiffies_num_of_values == \
@@ -119,7 +125,8 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
                     # We've received all CPU values for this period. Calculate diffs between
                     # current jiffies and previous jiffies.
                     self._logger.debug('Finished receiving all values for current CPU jiffies')
-                    self._logger.debug(f'current_cpu_jiffies: {self._current_cpu_jiffies}')
+                    self._logger.debug('current_cpu_jiffies: {current_cpu_jiffies}'.format(
+                        current_cpu_jiffies=self._current_cpu_jiffies))
                     jiffies_diff = dict()
                     for cpu_id in self._last_cpu_jiffies:
                         jiffies_diff[cpu_id] = dict()
@@ -165,7 +172,9 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
         pis = []
         for cpu_id in sorted(self._last_cpu_jiffies.keys()):
             for type_instance in sorted(self._last_cpu_jiffies[cpu_id].keys()):
-                pis.append(f'{self._host}/cpu/{cpu_id}/{type_instance}')
+                pis.append('{host}/cpu/{cpu_id}/{type_instance}'.format(
+                    host=self._host, cpu_id=cpu_id, type_instance=type_instance
+                ))
         return pis
 
     @overrides(SetterExtensionBase)
