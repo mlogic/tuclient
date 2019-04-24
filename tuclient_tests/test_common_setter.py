@@ -24,6 +24,7 @@ __docformat__ = 'reStructuredText'
 
 from configparser import ConfigParser
 import filecmp
+import logging
 from shutil import copyfile
 import tuclient
 from tuclient_extensions import common_setters
@@ -40,8 +41,8 @@ class TestCommonSetter(unittest.TestCase):
         tmp_nginx_conf = '/tmp/test_nginx.conf'
         copyfile(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_common_setter_nginx.conf',),
                  tmp_nginx_conf)
-        config = ConfigFile(None, 'tuclient', None, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                                                 'test_common_setter.conf', ))
+        config = tuclient.ConfigFile(None, 'tuclient', None, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                                          'test_common_setter.conf', ))
         setter = common_setters.Setter(self._logger, 'host1', config)
         self.assertListEqual(['host1/nginx_worker_connections'], setter.parameter_names)
         setter.start()

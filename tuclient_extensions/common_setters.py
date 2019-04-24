@@ -23,6 +23,7 @@ __docformat__ = 'reStructuredText'
 
 import functools
 import importlib
+from .setter_misc import *
 import re
 from tuclient import *
 # typing.NamedTuple is better than collections.namedtuple because the former allows
@@ -45,7 +46,7 @@ class Setter(SetterExtensionBase):
     """Common setters"""
 
     def __init__(self, logger, host, config=None):
-        """Create a CollectdOS instance
+        """Create a Common Setter instance
 
         :param logger: logger
         :param config: a ConfigBase instance for accessing configuration options
@@ -107,7 +108,7 @@ class Setter(SetterExtensionBase):
                 cand_val_str = config.get_config()[name + '_candidate_values']
                 m = re.match(r"\[(\d+)[, ]*(\d+)\]", cand_val_str)
                 if m is not None:
-                    calc_param_value_func = functools.partial(self._calc_param_value_from_range, float(m.group(1)),
+                    calc_param_value_func = functools.partial(param_value_from_range, float(m.group(1)),
                                                               float(m.group(2)))
                 else:
                     raise ValueError('Cannot parse candidate values ' + cand_val_str)
@@ -124,14 +125,14 @@ class Setter(SetterExtensionBase):
         # Prefix each parameter by our hostname before finishing
         self._parameter_names = [host+'/'+x for x in parameter_names]
 
-    def _config_file_set_func(self, calc_param_value_func, config_file, line_regex_obj, new_line, action_value):
+    def _config_file_set_func(self, param_value_func, config_file, line_regex_obj, new_line, action_value):
         # type: (Callable, str, object, str, float) -> None
         """Set the parameter in a config file
 
         This function only puts the change into a queue, because we need to group the
         change to the same configuration file to reduce overhead.
 
-        :param calc_param_value_func: a callable for calculating the parameter value from action value
+        :param param_value_func: a callable for calculating the parameter value from action value
         :param config_file: name of the config file
         :param line_regex_obj: regular expression Pattern object for matching the line to be changed
         :param new_line: new line to be put into the config file
@@ -140,13 +141,7 @@ class Setter(SetterExtensionBase):
             self._config_file_change_queue[config_file] = []
         self._config_file_change_queue[config_file].append(ConfigFileChangeAction(line_regex_obj,
                                                                                   new_line,
-                                                                                  calc_param_value_func(action_value)))
-
-    def _calc_param_value_from_range(self, a, b, action_value):
-        # type: (float, float, float) -> str
-        """Convert a float in [-1, 1] to a parameter value"""
-        assert a <= b
-        return str(int((b-a)/2 * (action_value + 1) + a))
+                                                                                  param_value_func(action_value)))
 
     def _commit_config_file_changes(self):
         for config_file, changes in self._config_file_change_queue.items():

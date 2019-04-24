@@ -1,4 +1,4 @@
-# TuneUp.ai Client Extensions
+"""Test cases for misc. setter functions"""
 # Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
 # All rights reserved.
 #
@@ -16,10 +16,24 @@
 # https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+
 __author__ = 'Yan Li'
 __copyright__ = 'Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>. All rights reserved.'
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
-from .setter_misc import *
-from .zmq_protocol import *
+
+from tuclient_extensions.setter_misc import *
+import unittest
+
+
+class TestConfig(unittest.TestCase):
+    def test_get_pids(self):
+        self.assertListEqual([1], get_pids('/sbin/init'))
+
+    def test_get_proc_cmdline(self):
+        self.assertTrue('/init' in get_proc_cmdline(1))
+
+
+if __name__ == '__main__':
+    unittest.main()
