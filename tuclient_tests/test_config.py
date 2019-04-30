@@ -85,7 +85,7 @@ class TestConfig(unittest.TestCase):
     def test_multiple_conf_file(self):
         config = ConfigFile(None, 'client', None,
                             [os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mock_conf_file.ini'),
-                             os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_client_conf.ini')])
+                             os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_client_daemon.conf')])
         self.assertEqual('/tmp/test_tuclient_log.txt', config.log_file())
 
     def test_empty_config_file(self):
