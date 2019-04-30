@@ -58,7 +58,7 @@ release-cp: release-dir
 	cp -a tlc Makefile setup.py tuclientd.py tuclient.service tuclient.spec \
 		tuclient_daemon.sh $(VERSIONED_NAME)
 
-	cp -a tuclient tuclient_extensions tuclient_tests \
+	cp -a setter_config tuclient tuclient_extensions tuclient_tests \
 		$(VERSIONED_NAME)
 
 archive: clean release-cp
@@ -112,6 +112,7 @@ install: install-dirs
 
 	# configuration files
 	install -Dpm 0644 tuclient_daemon.conf $(DESTDIR)$(SYSCONFDIR)/tuclient/tuclient_daemon.conf
+	install -Dpm 0644 setter_config $(DESTDIR)$(SYSCONFDIR)/tuclient/setter_config
 
 	# systemd units
 	install -Dpm 0644 tuclient.service $(DESTDIR)$(UNITDIR)/tuclient.service

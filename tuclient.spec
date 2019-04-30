@@ -124,10 +124,11 @@ fi
 %{python2_sitelib}/tuclient_extensions
 %{python2_sitelib}/tuclient_tests
 %endif
-%{_sbindir}/lc
+%{_sbindir}/tlc
 %{_sbindir}/tuclientd
 %dir %{_sysconfdir}/tuclient
 %config(noreplace) %{_sysconfdir}/tuclient/tuclient_daemon.conf
+%config(noreplace) %{_sysconfdir}/tuclient/setter_config
 %{_unitdir}/tuclient.service
 %dir %{_localstatedir}/log/tuclient
 %dir /run/tuclient
