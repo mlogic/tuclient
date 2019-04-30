@@ -166,18 +166,18 @@ class ConfigBase(object):
         return self.get_config()['protocol']
 
     def getter_module(self):
-        # type: () -> str
+        # type: () -> Optional[str]
         """Get the getter module name
 
         :return: getter module name"""
-        return self.get_config()['getter_module']
+        return self.get_config().get('getter_module', None)
 
     def setter_module(self):
-        # type: () -> str
+        # type: () -> Optional[str]
         """Get the setter module name
 
         :return: setter module name"""
-        return self.get_config()['setter_module']
+        return self.get_config().get('setter_module', None)
 
     def pidfile(self):
         # type: () -> Optional[str]

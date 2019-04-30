@@ -119,17 +119,28 @@ if __name__ == '__main__':
 
         # Setter modules
         setters = []   # type: List[SetterExtensionBase]
-        for setter_module_name in config.setter_module().split(', '):
-            setter_module = importlib.import_module(setter_module_name)
-            setter_class = getattr(setter_module, 'Setter')
-            setters.append(setter_class(logger, host, config))
+        setter_module_str = config.setter_module()
+        if setter_module_str is not None:
+            for setter_module_name in setter_module_str.split(', '):
+                setter_module = importlib.import_module(setter_module_name)
+                setter_class = getattr(setter_module, 'Setter')
+                setters.append(setter_class(logger, host, config))
 
         # Getter modules
         getters = []    # type: List[GetterExtensionBase]
-        for getter_module_name in config.getter_module().split(', '):
-            getter_module = importlib.import_module(getter_module_name)
-            getter_class = getattr(getter_module, 'Getter')
-            getters.append(getter_class(logger, host, config))
+        getter_module_str = config.getter_module()
+        if getter_module_str is not None:
+            for getter_module_name in getter_module_str.split(', '):
+                getter_module = importlib.import_module(getter_module_name)
+                getter_class = getattr(getter_module, 'Getter')
+                getters.append(getter_class(logger, host, config))
+
+        if len(setters) + len(getters) == 0:
+            logger.error('Setter and getter are both empty. You have to set at least one setter or getter.')
+            exit(2)
+
+        # It's ok for either setter or getter to be empty. The other required data
+        # can be from other nodes in the same cluster.
 
         # Start the setters and getters once they are all created. This is necessary
         # for collectd-related getters to get pi_names before we could create a
