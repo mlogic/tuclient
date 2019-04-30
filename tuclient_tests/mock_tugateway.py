@@ -102,7 +102,7 @@ class MockTUGateway(object):
             if self.do_an_action:
                 self.do_an_action = False
                 for client_id in self._clients_status.keys():
-                    self._send_to_client(client_id, [ProtocolCode.ACTION, [1.1] * self._action_len])
+                    self._send_to_client(client_id, [ProtocolCode.ACTION, [0.9] * self._action_len])
 
             if self._socket not in p:
                 continue
