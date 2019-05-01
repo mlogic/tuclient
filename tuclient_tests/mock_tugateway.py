@@ -41,6 +41,8 @@ class MockTUGateway(object):
         self._cluster_status = ClusterStatus.NOT_SETUP
         self._stopped = False
         self.do_an_action = False
+        # Mock action data to send to client. If none, [0.9] * action_len will be sent.
+        self.action_data = None
         self._action_len = action_len
         self._clients_status = dict()  # type: Dict[UUID, ClientStatus]
         self._clients_name = dict()    # type: Dict[UUID, str]
@@ -102,7 +104,11 @@ class MockTUGateway(object):
             if self.do_an_action:
                 self.do_an_action = False
                 for client_id in self._clients_status.keys():
-                    self._send_to_client(client_id, [ProtocolCode.ACTION, [0.9] * self._action_len])
+                    if self.action_data is None:
+                        action_data = [0.9] * self._action_len
+                    else:
+                        action_data = self.action_data
+                    self._send_to_client(client_id, [ProtocolCode.ACTION, action_data])
 
             if self._socket not in p:
                 continue

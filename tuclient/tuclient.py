@@ -78,8 +78,9 @@ from uuid import *
 class TUClient:
     """The TuneUp.ai Client Class"""
     def __init__(self, logger, client_id, cluster_name, node_name, api_secret_key, protocol, getters, setters,
-                 network_timeout, tuning_goal_name, tuning_goal_calculator, tick_len=1, debugging_level=0, sending_pi_right_away=True):
-        # type: (logging.Logger, UUID, str, str, str, ProtocolExtensionBase, Optional[List[GetterExtensionBase]], Optional[List[SetterExtensionBase]], int, str, TuningGoalCalculatorBase, int, int, bool) -> None
+                 network_timeout, tuning_goal_name, tuning_goal_calculator, tick_len=1, debugging_level=0,
+                 sending_pi_right_away=True):
+        # type: (logging.Logger, UUID, str, str, str, ProtocolExtensionBase, Optional[List[GetterExtensionBase]], Optional[List[SetterExtensionBase]], int, Optional[str], Optional[TuningGoalCalculatorBase], int, int, bool) -> None
         """ Create a TUClient instance
 
         :param logger: a Logger instance
@@ -111,7 +112,7 @@ class TUClient:
                                                                                 hostname=socket.gethostname()))
         self._getters = getters
         self._setters = setters
-        self._tuning_goal_name = tuning_goal_name
+        self._tuning_goal_name = tuning_goal_name if tuning_goal_name is not None else ''
         self._tuning_goal_calculator = tuning_goal_calculator
         self._tick_len = tick_len
         self._logger.info('tick_len: {tick_len}'.format(tick_len=tick_len))
@@ -240,7 +241,10 @@ class TUClient:
                                 self._logger.debug('Client node {node_name} collected from all getters: {pi_data}'
                                                    .format(node_name=self._node_name, pi_data=str(pi_data)))
 
-                                tuning_goal = self._tuning_goal_calculator.get_tuning_goal(pi_data)
+                                if self._tuning_goal_calculator is None:
+                                    tuning_goal = 0
+                                else:
+                                    tuning_goal = self._tuning_goal_calculator.get_tuning_goal(pi_data)
                                 assert -1 <= tuning_goal <= 1
                                 self._logger.debug('Client node {node_name} collected tuning goal: {tuning_goal}'
                                                    .format(node_name=self._node_name, tuning_goal=str(tuning_goal)))
@@ -347,7 +351,8 @@ class TUClient:
                     actions = msg[2]
                     self._logger.debug('Performing action ' + str(actions))
                     for c in self._setters:
-                        c.action(actions)
+                        # TODO: TUE-224: support different intervals
+                        c.action(-1, actions)
                     self._logger.debug('Finished performing action.')
                     self.timestamp_and_send_list([ProtocolCode.ACTION_DONE])
                     if self._tick_len == 0:

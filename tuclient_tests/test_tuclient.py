@@ -103,7 +103,7 @@ class TestTUClient(unittest.TestCase):
             mock_parameter_names = ['param1']
 
             @overrides(SetterExtensionBase)
-            def action(self, actions):
+            def action(self, interval, actions):
                 global _total_actions
                 _total_actions += 1
 

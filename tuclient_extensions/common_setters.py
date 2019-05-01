@@ -164,8 +164,16 @@ class Setter(SetterExtensionBase):
     def action(self, interval, actions):
         # type: (int, List[float]) -> None
         """Perform actions
+
+        For test cases, if all parameters have the same interval, we can set interval
+        to -1 and the actions will be applied to all parameters. The behavior is
+        undefined if the parameters have more than one interval.
         :param interval: intervals for this batch of actions
         :param actions: a list of actions to perform"""
+        if interval == -1:
+            # TODO: This shouldn't be needed when TUE-224 is finished.
+            assert len(self._parameters) == 1
+            interval = list(self._parameters.keys())[0]
         assert len(self._parameters[interval]) == len(actions)
         assert len(self._config_file_change_queue) == 0
         # We use a set to track the index of the post_set_func we need to call,
