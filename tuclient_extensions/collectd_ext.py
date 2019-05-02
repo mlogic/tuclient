@@ -97,6 +97,7 @@ class CollectdExt:
             collectd_bin = os.path.join(os.environ['SNAP'], 'usr/sbin/collectd')
         else:
             collectd_bin = '/usr/sbin/collectd'
+        self._logger.info('Creating a collectd process using binary ' + collectd_bin)
         return subprocess.Popen([collectd_bin, '-f', '-C', self._collectd_conf_file_path],
                                 stdout=self._collectd_log_file, stderr=self._collectd_log_file)
 
@@ -204,8 +205,12 @@ class CollectdExt:
                 collectd_proc.wait()
 
     def start(self):
-        self._thread = threading.Thread(target=self._thread_func)
-        self._thread.start()
+        if self._thread is None:
+            self._logger.debug('Starting a new collectd_ext thread')
+            self._thread = threading.Thread(target=self._thread_func)
+            self._thread.start()
+        else:
+            self._logger.debug('A collectd_ext thread is already running')
 
     def stop(self):
         self._stopped = True
@@ -220,5 +225,8 @@ def get_collectd_ext_instance(logger):
     # type: (logging.Logger) -> CollectdExt
     global _collectd_inst
     if _collectd_inst is None:
+        logger.debug('Creating a new CollectdExt instance')
         _collectd_inst = CollectdExt(logger)
+    else:
+        logger.debug('Reusing the existing CollectdExt instance')
     return _collectd_inst
