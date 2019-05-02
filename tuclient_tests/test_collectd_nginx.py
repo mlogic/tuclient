@@ -57,9 +57,12 @@ class TestCollectdNGINX(unittest.TestCase):
         collectd_nginx = None
         try:
             mock_config = {'collectd_nginx_status_url':
-                           'http://localhost:8080/status'}
+                           'http://localhost:8080/status',
+                           # Test parsing of collectd_nginx_max_connections from an str
+                           'collectd_nginx_max_connections': '50'}
             collectd_nginx = Getter(self._logger, 'host1', config=ConfigBase(default=mock_config))
             collectd_nginx.start()
+            self.assertEqual(collectd_nginx._normalize_factor, 25)
             self.assertListEqual(['host1/nginx/connections_accepted', 'host1/nginx/connections_failed',
                                   'host1/nginx/connections_handled', 'host1/nginx/nginx_connections_active',
                                   'host1/nginx/nginx_connections_reading', 'host1/nginx/nginx_connections_waiting',

@@ -59,8 +59,8 @@ class Getter(GetterExtensionBase):
         plugin_options = None
         self._normalize_factor = 100 / 2
         if config is not None:
-            self._normalize_factor = config.get_config().get('collectd_nginx_max_connections',
-                                                             self._normalize_factor * 2) / 2
+            self._normalize_factor = int(config.get_config().get('collectd_nginx_max_connections',
+                                                                 self._normalize_factor * 2)) / 2
             if 'collectd_nginx_status_url' in config.get_config():
                 plugin_options = f'URL "{config.get_config()["collectd_nginx_status_url"]}"'
         self._collectd.add_plugin('nginx', options=plugin_options)
