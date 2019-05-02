@@ -55,17 +55,26 @@ class CollectdExt:
             self._collectd_conf_template = collectd_conf_template
 
         if os.geteuid() == 0:
-            self._collectd_basedir = '/var/run/tuclient'
-            logdir = '/var/log/tuclient'
-            if not os.access(logdir, os.F_OK):
-                os.mkdir(logdir)
-            collectd_log_file_path = os.path.join(logdir, 'collectd.log')
+            if 'SNAP_DATA' in os.environ:
+                snap_data_dir = os.environ['SNAP_DATA']
+                self._collectd_basedir = os.path.join(snap_data_dir, 'collectd')
+                logdir = self._collectd_basedir
+                self._in_snap = True
+            else:
+                self._collectd_basedir = '/var/run/tuclient'
+                logdir = '/var/log/tuclient'
+                self._in_snap = False
         else:
             self._collectd_basedir = '/tmp/tuclient'
-            collectd_log_file_path = os.path.join(self._collectd_basedir, 'collectd.log')
+            logdir = self._collectd_basedir
+            self._in_snap = False
 
         if not os.access(self._collectd_basedir, os.F_OK):
             os.mkdir(self._collectd_basedir)
+        if not os.access(logdir, os.F_OK):
+            os.mkdir(logdir)
+        collectd_log_file_path = os.path.join(logdir, 'collectd.log')
+
         self._collectd_log_file = open(collectd_log_file_path, 'w+')
         self._collectd_conf_file_path = os.path.join(self._collectd_basedir, 'collectd.conf')
 
@@ -84,7 +93,11 @@ class CollectdExt:
         self._callbacks[plugin_name].append(callback)
 
     def _start_collectd(self):
-        return subprocess.Popen(['/usr/sbin/collectd', '-f', '-C', self._collectd_conf_file_path],
+        if self._in_snap:
+            collectd_bin = os.path.join(os.environ['SNAP'], 'usr/sbin/collectd')
+        else:
+            collectd_bin = '/usr/sbin/collectd'
+        return subprocess.Popen([collectd_bin, '-f', '-C', self._collectd_conf_file_path],
                                 stdout=self._collectd_log_file, stderr=self._collectd_log_file)
 
     def _gen_collectd_conf_file(self):
