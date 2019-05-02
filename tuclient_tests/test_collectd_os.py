@@ -22,8 +22,9 @@ __copyright__ = 'Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
+import logging
 import tuclient
-from tuclient_extensions.collectd_os import *
+from tuclient_extensions.collectd_os import Getter
 import unittest
 
 
@@ -51,7 +52,7 @@ class TestCollectdOS(unittest.TestCase):
     def test_start_stop(self):
         collectd_os = None
         try:
-            collectd_os = CollectdOS(self._logger, 'host_a')
+            collectd_os = Getter(self._logger, 'host_a')
             collectd_os.start()
             num_pis = len(collectd_os.pi_names)
             self.assertGreater(num_pis, 1)
@@ -63,7 +64,7 @@ class TestCollectdOS(unittest.TestCase):
     def test_parsing_data(self):
         collectd_os = None
         try:
-            collectd_os = CollectdOS(self._logger, 'host_a', collectd_instance=MockCollectd())
+            collectd_os = Getter(self._logger, 'host_a', collectd_instance=MockCollectd())
             self._records_received = 0
             collectd_os.start()
             collectd_os._on_receiving_cpu_data('host_a', 'cpu',

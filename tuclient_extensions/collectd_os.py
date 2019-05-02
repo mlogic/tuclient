@@ -27,7 +27,7 @@ from tuclient_extensions import collectd_proto
 from typing import List
 
 
-class CollectdOS(GetterExtensionBase, SetterExtensionBase):
+class Getter(GetterExtensionBase):
     """Getter and Setter for using collectd to collect operating system information"""
 
     def __init__(self, logger, host, config=None, collectd_instance=None):
@@ -36,7 +36,7 @@ class CollectdOS(GetterExtensionBase, SetterExtensionBase):
         :param logger: logger
         :param config: a ConfigBase instance for accessing configuration options
         :param collectd_instance: a collectd_ext instance"""
-        super(CollectdOS, self).__init__(logger, host, config)
+        super(Getter, self).__init__(logger, host, config)
         if collectd_instance is None:
             self._collectd = tuclient_extensions.collectd_ext.get_collectd_ext_instance(logger)
         else:
