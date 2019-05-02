@@ -30,11 +30,12 @@ import logging
 class GetterExtensionBase(object):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, logger, host, config):
+    def __init__(self, logger, host, config, name=''):
         # type: (logging.Logger, str, Optional[ConfigBase]) -> None
         self._logger = logger
         self._host = host
         self._config = config
+        self.name = name
 
     @abc.abstractmethod
     def start(self):

@@ -49,7 +49,7 @@ class Getter(GetterExtensionBase):
         :param logger: logger
         :param config: a ConfigBase instance for accessing configuration options
         :param collectd_instance: a collectd_ext instance"""
-        super(Getter, self).__init__(logger, host, config)
+        super(Getter, self).__init__(logger, host, config, 'collectd_nginx')
         if collectd_instance is None:
             self._collectd = tuclient_extensions.collectd_ext.get_collectd_ext_instance(logger)
         else:

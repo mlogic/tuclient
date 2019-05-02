@@ -110,6 +110,7 @@ if __name__ == '__main__':
             else args.command_socket_address
         protocol_name = config.protocol()
         if protocol_name == 'zmq':
+            logger.info('Creating ZMQ protocol to listen for control command on ' + cmd_socket_addr)
             protocol = ZMQProtocol(logger, client_id,
                                    args.gateway_addr if args.gateway_addr is not None else config.gateway_address(),
                                    cmd_socket_addr=cmd_socket_addr)
@@ -122,18 +123,26 @@ if __name__ == '__main__':
         setter_module_str = config.setter_module()
         if setter_module_str is not None:
             for setter_module_name in setter_module_str.split(', '):
+                logger.info('Loading setter ' + setter_module_name)
                 setter_module = importlib.import_module(setter_module_name)
                 setter_class = getattr(setter_module, 'Setter')
                 setters.append(setter_class(logger, host, config))
+                logger.info('Finished loading setter ' + setter_module_name)
+        else:
+            logger.info('No setter is set')
 
         # Getter modules
         getters = []    # type: List[GetterExtensionBase]
         getter_module_str = config.getter_module()
         if getter_module_str is not None:
             for getter_module_name in getter_module_str.split(', '):
+                logger.info('Loading getter ' + getter_module_name)
                 getter_module = importlib.import_module(getter_module_name)
                 getter_class = getattr(getter_module, 'Getter')
                 getters.append(getter_class(logger, host, config))
+                logger.info('Finished loading getter ' + getter_module_name)
+        else:
+            logger.info('No getter is set')
 
         if len(setters) + len(getters) == 0:
             logger.error('Setter and getter are both empty. You have to set at least one setter or getter.')
@@ -147,10 +156,14 @@ if __name__ == '__main__':
         # TuningGoalCalculator below.
         pi_names = []
         for getter in getters:
+            logger.info('Starting getter' + (' ' + getter.name) if getter.name != '' else '')
             getter.start()
             pi_names += getter.pi_names
-        for i in setters:
-            i.start()
+            logger.info('Getter' + (' ' + getter.name) if getter.name != '' else '' + ' is started')
+        for setter in setters:
+            logger.info('Starting setter' + (' ' + setter.name) if setter.name != '' else '')
+            setter.start()
+            logger.info('Setter' + (' ' + setter.name) if setter.name != '' else '' + ' is started')
 
         # tick_len
         tuclient_kwargs = dict()
@@ -162,11 +175,13 @@ if __name__ == '__main__':
         if tuning_goal_regex is None:
             raise ValueError('tuning_goal_regex is not set.')
 
+        logger.info('Creating the client instance')
         client = TUClient(logger, client_id, cluster_name=cluster_name, node_name=node_name,
                           api_secret_key=api_secret_key, protocol=protocol, getters=getters, setters=setters,
                           network_timeout=network_timeout, tuning_goal_name=tuning_goal_regex,
                           tuning_goal_calculator=TuningGoalCalculatorRegex(logger, config, pi_names, tuning_goal_regex),
                           sending_pi_right_away=False, **tuclient_kwargs)
+        logger.info('Client instance is created')
 
         pidfile_name = args.pidfile if args.pidfile is not None else config.pidfile()
         if pidfile_name is not None:
@@ -197,9 +212,11 @@ if __name__ == '__main__':
             context.files_preserve = [tulogging._log_file_handler.stream]
 
             with context:
+                logger.info('Starting the client instance')
                 client.start()
         else:
             # If a pidfile is not set, we start as a simple program.
+            logger.info('Starting the client instance')
             client.start()
     except Exception as err:
         logger.error('Client node {node_name} fatal error: {err_name}: {err}'
