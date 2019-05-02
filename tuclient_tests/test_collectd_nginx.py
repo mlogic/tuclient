@@ -58,7 +58,7 @@ class TestCollectdNGINX(unittest.TestCase):
         try:
             mock_config = {'collectd_nginx_status_url':
                            'http://localhost:8080/status'}
-            collectd_nginx = CollectdNGINX(self._logger, 'host1', config=ConfigBase(default=mock_config))
+            collectd_nginx = Getter(self._logger, 'host1', config=ConfigBase(default=mock_config))
             collectd_nginx.start()
             self.assertListEqual(['host1/nginx/connections_accepted', 'host1/nginx/connections_failed',
                                   'host1/nginx/connections_handled', 'host1/nginx/nginx_connections_active',
@@ -74,7 +74,7 @@ class TestCollectdNGINX(unittest.TestCase):
     def test_parsing_data(self):
         collectd_nginx = None
         try:
-            collectd_nginx = CollectdNGINX(self._logger, 'host1', collectd_instance=MockCollectd())
+            collectd_nginx = Getter(self._logger, 'host1', collectd_instance=MockCollectd())
             self._records_received = 0
             collectd_nginx.start()
             collectd_nginx._on_receiving_nginx_data('host1', 'nginx',

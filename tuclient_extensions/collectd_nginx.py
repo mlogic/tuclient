@@ -28,7 +28,7 @@ from tuclient_extensions import collectd_proto
 from typing import Dict, List
 
 
-class CollectdNGINX(GetterExtensionBase, SetterExtensionBase):
+class Getter(GetterExtensionBase):
     """Getter and Setter for using collectd to collect operating system information"""
 
     # Make sure the dict keeps its order
@@ -49,7 +49,7 @@ class CollectdNGINX(GetterExtensionBase, SetterExtensionBase):
         :param logger: logger
         :param config: a ConfigBase instance for accessing configuration options
         :param collectd_instance: a collectd_ext instance"""
-        super(CollectdNGINX, self).__init__(logger, host, config)
+        super(Getter, self).__init__(logger, host, config)
         if collectd_instance is None:
             self._collectd = tuclient_extensions.collectd_ext.get_collectd_ext_instance(logger)
         else:
@@ -105,12 +105,12 @@ class CollectdNGINX(GetterExtensionBase, SetterExtensionBase):
             elif part_type == collectd_proto.PART_TYPE_VALUES:
                 assert len(part_data) == 1
                 data_name = f'{type}_{type_instance}' if type_instance != '' else type
-                assert part_data[0][0] == CollectdNGINX.EXPECTED_DATA_TYPES[data_name]
+                assert part_data[0][0] == Getter.EXPECTED_DATA_TYPES[data_name]
                 self._current_pi_raw_data[data_name] = part_data[0][1]
                 if len(self._current_pi_raw_data) == 8:
                     if self._last_pi_raw_data is not None:
                         pi_data = dict()
-                        for data_name, data_type in CollectdNGINX.EXPECTED_DATA_TYPES.items():
+                        for data_name, data_type in Getter.EXPECTED_DATA_TYPES.items():
                             if data_type == collectd_proto.DATA_TYPE_DERIVE:
                                 pi_data[data_name] = self._current_pi_raw_data[data_name] - \
                                                      self._last_pi_raw_data[data_name]
@@ -131,9 +131,9 @@ class CollectdNGINX(GetterExtensionBase, SetterExtensionBase):
         """Collect Performance Indicators"""
         while self._pi_data is None:
             time.sleep(0.01)
-        outgoing_values = [0] * len(CollectdNGINX.EXPECTED_DATA_TYPES)
+        outgoing_values = [0] * len(Getter.EXPECTED_DATA_TYPES)
         i = 0
-        for name in CollectdNGINX.EXPECTED_DATA_TYPES.keys():
+        for name in Getter.EXPECTED_DATA_TYPES.keys():
             outgoing_values[i] = clip(self._pi_data[name] / self._normalize_factor - 1, -1, 1)
             self._logger.debug(f'Collected {name}: {self._pi_data[name]}, normalized to {outgoing_values[i]}')
             i += 1
@@ -145,7 +145,7 @@ class CollectdNGINX(GetterExtensionBase, SetterExtensionBase):
     def pi_names(self):
         # type: () -> List[str]
         """Return the list of all Performance Indicator names"""
-        return [f'{self._host}/nginx/{x}' for x in CollectdNGINX.EXPECTED_DATA_TYPES.keys()]
+        return [f'{self._host}/nginx/{x}' for x in Getter.EXPECTED_DATA_TYPES.keys()]
 
     @overrides(SetterExtensionBase)
     def action(self, actions):
