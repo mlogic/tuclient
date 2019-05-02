@@ -43,7 +43,7 @@ setup(name='tuclient',
       packages=['tuclient', 'tuclient_extensions'],
       scripts=['tlc', 'tuclientd.py'],
       package_data={'tuclient': ['default.conf', 'tuclient_daemon.conf', 'tuclient_snap.conf'],
-                    'tuclient_extensions': ['collectd_template.conf']},
+                    'tuclient_extensions': ['collectd_template.conf', 'setter_config/nginx_setter.conf']},
       setup_requires=setup_requires,
       # Metadata for PyPI
       author='Yan Li',

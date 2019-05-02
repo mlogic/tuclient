@@ -45,6 +45,19 @@ ActionIndexToPostSetFuncIndexMap = Dict[int, int]
 class Setter(SetterExtensionBase):
     """Common setters"""
 
+    @staticmethod
+    def _find_config_file_abspath(config_file):
+        # Get the absolute pathname for the config file. We search the
+        # etc_dir/SNAP_DATA first. This makes it possible for the user
+        # to carry a modified version there (config files in sitelib/tuclient are
+        # immutable in the snap package).
+        etc_dir = os.environ.get('SNAP_DATA', '/etc/tuclient')
+        for config_home in (etc_dir, os.path.dirname(os.path.abspath(__file__))):
+            config_file_abs = os.path.join(config_home, config_file)
+            if os.path.exists(config_file_abs):
+                return config_file_abs
+        raise RuntimeError('Cannot find common setters config file ' + config_file)
+
     def __init__(self, logger, host, config=None):
         """Create a Common Setter instance
 
@@ -54,8 +67,10 @@ class Setter(SetterExtensionBase):
         super(Setter, self).__init__(logger, host, config)
         for config_file in config.get_config()['common_setters_config_files'].split(', '):
             if not os.path.isabs(config_file):
-                # Get the absolute pathname for the config file
-                config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../' + config_file)
+                config_file = self._find_config_file_abspath(config_file)
+            logger.info(f'Loading common setters config file {config_file} '
+                        '(if this is not the correct file, make sure you use the correct absolute path '
+                        'for common_setters_config_files.')
             config = ConfigFile(logger, 'client', host, config_file, config.get_config())
 
         # Used by `_config_file_set_func()`

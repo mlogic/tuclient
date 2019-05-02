@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 set -eu
 
-# Create a default config file
-cp "$SNAP"/lib/python*/site-packages/tuclient/tuclient_snap.conf "$SNAP_DATA"
+# Copy the default config file and common setters' config files
+cp -a "$SNAP"/lib/python*/site-packages/tuclient/tuclient_snap.conf "$SNAP_DATA"
+cp -ar "$SNAP"/lib/python*/site-packages/tuclient_extensions/setter_config "$SNAP_DATA"
