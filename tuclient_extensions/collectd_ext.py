@@ -117,6 +117,13 @@ class CollectdExt:
             conf_str = f.read()
             conf_str = conf_str.replace('{% plugins %}', plugin_conf)
             conf_str = conf_str.replace('{% basedir %}', self._collectd_basedir)
+            if self._in_snap:
+                conf_str = conf_str.replace('{% plugindir %}', os.path.join(os.environ['SNAP'], 'usr/lib/collectd'))
+                conf_str = conf_str.replace('{% typesdb %}', os.path.join(os.environ['SNAP'],
+                                                                          'usr/share/collectd/types.db'))
+            else:
+                conf_str = conf_str.replace('{% plugindir %}', '/usr/lib/collectd')
+                conf_str = conf_str.replace('{% typesdb %}', '/usr/share/collectd/types.db')
 
         with open(self._collectd_conf_file_path, 'w') as f:
             f.write(conf_str)
