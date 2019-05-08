@@ -89,7 +89,8 @@ if __name__ == '__main__':
     if args.verbose:
         logger.setLevel(logging.DEBUG)
     else:
-        logger.setLevel(logging.INFO)
+        # Use the level set by config.get_logger() according to config file setting
+        pass
 
     # Configuration
     # These initial values are necessary if exception occurs in config.*()
