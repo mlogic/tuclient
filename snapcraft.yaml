@@ -22,6 +22,12 @@ parts:
       - requirements.txt
     stage-packages:
       - collectd
+      # The following packages are required by collectd
+      - libcurl3-gnutls
+      - libdevmapper-event1.02.1
+      - libip6tc0
+      - liblvm2app2.2
+      - libperl5.26
 
 apps:
   tlc:
