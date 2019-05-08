@@ -54,7 +54,7 @@ def cluster_status_handler(sub_args):
     print('List of client nodes:')
     print('==========================================')
     for client_id, client_name, client_status in client_list:
-        print('{client_id:10},{client_name:30},{client_status}'.
+        print('{client_id},{client_name},{client_status}'.
               format(client_id=client_id, client_name=client_name,
                      client_status=ClientStatusToStrMapping[client_status]))
     print()
