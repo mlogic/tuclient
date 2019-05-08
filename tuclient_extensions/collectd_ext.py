@@ -93,11 +93,12 @@ class CollectdExt:
         self._callbacks[plugin_name].append(callback)
 
     def _start_collectd(self):
+        # type: () -> subprocess.Popen
         if self._in_snap:
             collectd_bin = os.path.join(os.environ['SNAP'], 'usr/sbin/collectd')
         else:
             collectd_bin = '/usr/sbin/collectd'
-        self._logger.info('Creating a collectd process using binary ' + collectd_bin)
+        self._logger.info('Creating a collectd subprocess using binary ' + collectd_bin)
         return subprocess.Popen([collectd_bin, '-f', '-C', self._collectd_conf_file_path],
                                 stdout=self._collectd_log_file, stderr=self._collectd_log_file)
 
@@ -183,7 +184,7 @@ class CollectdExt:
         collectd_socket = None
         try:
             collectd_proc = self._start_collectd()
-            self._logger.info('collectd listener started')
+            self._logger.info('collectd subprocess is started')
             family, socktype, proto, canonname, sockaddr = socket.getaddrinfo(listen_addr,
                                                                               listen_port,
                                                                               socket.AF_UNSPEC,
@@ -194,6 +195,7 @@ class CollectdExt:
             collectd_socket.setblocking(False)
             collectd_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             collectd_socket.bind(sockaddr)
+            self._logger.info('collectd listener is started')
 
             while not self._stopped:
                 rlist, _, _ = select.select([collectd_socket], [], [], 1)
@@ -201,6 +203,20 @@ class CollectdExt:
                     self._buf += self._recv_all_from_sock(collectd_socket)
                     parts, self._buf = tuclient_extensions.collectd_proto.parse_parts(self._buf)
                     self._process_packets(parts)
+
+                # Monitor the status of our collectd subprocess
+                collectd_proc.poll()
+                if collectd_proc.returncode is not None:
+                    self._logger.error("collectd subprocess is terminated with return code {returncode}. ".
+                                       format(returncode=collectd_proc.returncode) +
+                                       "Check collectd's log in {collectd_basedir} for more information. ".
+                                       format(collectd_basedir=self._collectd_basedir) +
+                                       "Stopping the collectd listener...")
+                    # For now we just quit. Maybe we should try to restart collectd, but
+                    # it is not clear that there's any beneficial to that before someone
+                    # could check collectd's log and fix the underlying issue.
+                    self._stopped = True
+
             self._logger.info('collectd listener stopped')
         finally:
             if collectd_proc is not None:
