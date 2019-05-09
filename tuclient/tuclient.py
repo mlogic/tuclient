@@ -216,6 +216,7 @@ class TUClient:
                            (self._tick_len == 0 and force_collect):
                             # Last collect wall time must be updated *before* collecting to prevent the send time from
                             # slowly drifting away
+                            self._logger.debug('Time is reached to do collection. Starting...')
                             if self._tick_len > 0:
                                 self._last_collect_wall_time = ts
                             else:
@@ -232,6 +233,7 @@ class TUClient:
                                         node_name=self._node_name, g=g
                                     ))
                                 else:
+                                    self._logger.debug('Collected data from getter: ' + str(d))
                                     pi_data.extend(d)
                             if len(pi_data) == 0:
                                 self._logger.info(
@@ -254,8 +256,10 @@ class TUClient:
                                                              ts=self._last_collect_wall_time)
                                 # We don't wait for 'OK' to save time
                         else:
+                            self._logger.debug('Collection time is not reached yet')
                             pass
                     else:
+                        self._logger.debug('No getter is set. Skipped collecting.')
                         self._last_collect_wall_time = time.time()
 
                 gc.collect()

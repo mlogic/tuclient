@@ -82,7 +82,7 @@ if __name__ == '__main__':
         conffiles = args.conf
     host = socket.gethostname()
     config = ConfigFile(None, 'client', host, conffiles)
-    if args.log_file is None:
+    if args.log_file is None or args.log_file == '':
         logger = config.get_logger()
     else:
         logger = tulogging.get_file_logger(args.log_file)
