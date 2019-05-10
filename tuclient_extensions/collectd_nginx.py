@@ -63,6 +63,10 @@ class Getter(GetterExtensionBase):
                                                                  self._normalize_factor * 2)) / 2
             if 'collectd_nginx_status_url' in config.get_config():
                 plugin_options = f'URL "{config.get_config()["collectd_nginx_status_url"]}"'
+            else:
+                err_msg = 'collectd_nginx_status_url is missing'
+                logger.error(err_msg)
+                raise ValueError(err_msg)
         self._collectd.add_plugin('nginx', options=plugin_options)
         self._collectd.register_callback('nginx', self._on_receiving_nginx_data)
 
