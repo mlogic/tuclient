@@ -227,17 +227,20 @@ class TUClient:
                                 force_collect = False
                             pi_data = []
                             for g in self._getters:
+                                self._logger.debug("Starting to collect data from getter '{getter_name}'".
+                                                   format(getter_name=g.name))
                                 d = g.collect()
                                 if d is None or len(d) == 0:
-                                    self._logger.warning('Client node {node_name} getter {g} did not return any data'.format(
-                                        node_name=self._node_name, g=g
-                                    ))
+                                    self._logger.warning("Client node {node_name} getter '{getter_name}' did not return"
+                                                         " any data".format(node_name=self._node_name,
+                                                                            getter_name=g.name))
                                 else:
-                                    self._logger.debug('Collected data from getter: ' + str(d))
+                                    self._logger.debug("Collected data from getter '{getter_name}': {data}".format(
+                                        getter_name=g.name, data=str(d)))
                                     pi_data.extend(d)
                             if len(pi_data) == 0:
                                 self._logger.info(
-                                    'Client node {node_name} getter returns no data. Skipped sending.'.format(
+                                    'Client node {node_name} all getters return no data. Skipped sending.'.format(
                                         node_name=self._node_name))
                             else:
                                 self._logger.debug('Client node {node_name} collected from all getters: {pi_data}'

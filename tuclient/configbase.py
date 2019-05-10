@@ -76,8 +76,6 @@ class ConfigBase(object):
             self.log(logging.DEBUG, 'Loaded default config file ' + str(loaded_files))
             self._config = cp.defaults()
             if default is not None:
-                # TODO
-                print(default)
                 self._config.update(default)
 
     def get_config(self):

@@ -129,8 +129,14 @@ class Getter(GetterExtensionBase):
     def collect(self):
         # type: () -> List[float]
         """Collect Performance Indicators"""
+        start_ts = monotonic_time()
         while self._pi_data is None:
             time.sleep(0.01)
+            if monotonic_time() - start_ts > 5:
+                err_msg = 'Reading data from NGINX timed out. Please check collectd log for error information'
+                self._logger.error(err_msg)
+                raise RuntimeError(err_msg)
+
         outgoing_values = [0] * len(Getter.EXPECTED_DATA_TYPES)
         i = 0
         for name in Getter.EXPECTED_DATA_TYPES.keys():
