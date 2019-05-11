@@ -129,11 +129,17 @@ test:
 	tuclient_tests/test_tuclient_daemon.sh
 	tuclient_tests/test_tlc.sh
 
+snap:
+	if ! systemctl status snap.multipass.multipassd.service; then \
+		    systemctl start snap.multipass.multipassd.service; \
+	fi
+	snapcraft
+
 func-test: test
 
 lint:
 	$(PYLINT) -E -f parseable tuclient *.py
 
 .PHONY: archive clean clean-mock-result-dir func-test install install-dirs lint \
-        mock-build mock-devel-build mock-result-dir rpm rpm-build-dir srpm \
+        mock-build mock-devel-build mock-result-dir rpm rpm-build-dir snap srpm \
         tag test
