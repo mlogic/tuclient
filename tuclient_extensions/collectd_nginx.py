@@ -135,6 +135,8 @@ class Getter(GetterExtensionBase):
         """Collect Performance Indicators"""
         start_ts = monotonic_time()
         while self._pi_data is None:
+            if not self._collectd.is_alive():
+                raise RuntimeError('collectd thread is dead')
             time.sleep(0.01)
             if monotonic_time() - start_ts > 5:
                 err_msg = 'Reading data from NGINX timed out. Please check collectd log for error information'

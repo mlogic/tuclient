@@ -149,6 +149,8 @@ class Getter(GetterExtensionBase):
         # type: () -> List[float]
         """Collect Performance Indicators"""
         while self._last_cpu_jiffies_diff is None:
+            if not self._collectd.is_alive():
+                raise RuntimeError('collectd thread is dead')
             time.sleep(0.01)
         # We have data from all plugins. Prepare to send them out.
         outgoing_values = [0] * self._num_cpu * self._num_cpu_type_instances

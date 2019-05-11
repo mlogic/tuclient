@@ -27,6 +27,7 @@ import select
 import socket
 import subprocess
 import threading
+import time
 import tuclient_extensions.collectd_proto
 
 _collectd_inst = None
@@ -41,7 +42,8 @@ class CollectdExt:
         :param logger: the logger
         :param collectd_conf_template: overriding the default collectd conf template"""
         self._logger = logger
-        self._stopped = False
+        self._started = False
+        self._stop_requested = False
         # We use a member-wise buffer for the rare case that one socket.recv() only
         # received a half of packet.
         self._buf = b''
@@ -196,8 +198,9 @@ class CollectdExt:
             collectd_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             collectd_socket.bind(sockaddr)
             self._logger.info('collectd listener is started')
+            self._started = True
 
-            while not self._stopped:
+            while not self._stop_requested:
                 rlist, _, _ = select.select([collectd_socket], [], [], 1)
                 if collectd_socket in rlist:
                     self._buf += self._recv_all_from_sock(collectd_socket)
@@ -215,7 +218,7 @@ class CollectdExt:
                     # For now we just quit. Maybe we should try to restart collectd, but
                     # it is not clear that there's any beneficial to that before someone
                     # could check collectd's log and fix the underlying issue.
-                    self._stopped = True
+                    self._stop_requested = True
 
             self._logger.info('collectd listener stopped')
         finally:
@@ -225,18 +228,27 @@ class CollectdExt:
             if collectd_socket is not None:
                 collectd_socket.close()
             if collectd_proc is not None:
+                self._logger.info('Waiting for the collectd subprocess to stop...')
                 collectd_proc.wait()
+            self._started = False
 
     def start(self):
         if self._thread is None:
             self._logger.debug('Starting a new collectd_ext thread')
             self._thread = threading.Thread(target=self._thread_func)
             self._thread.start()
+            while not self._started:
+                time.sleep(0.001)
+                if not self._thread.is_alive():
+                    raise RuntimeError('Starting collectd_ext thread failed.')
         else:
             self._logger.debug('A collectd_ext thread is already running')
 
     def stop(self):
-        self._stopped = True
+        self._stop_requested = True
+
+    def is_alive(self):
+        return self._started
 
     def __del__(self):
         if self._thread is not None:
