@@ -28,6 +28,7 @@ import socket
 import subprocess
 import threading
 import time
+import traceback
 import tuclient_extensions.collectd_proto
 
 _collectd_inst = None
@@ -208,8 +209,7 @@ class CollectdExt:
                     self._process_packets(parts)
 
                 # Monitor the status of our collectd subprocess
-                collectd_proc.poll()
-                if collectd_proc.returncode is not None:
+                if collectd_proc.poll() is not None:
                     self._logger.error("collectd subprocess is terminated with return code {returncode}. ".
                                        format(returncode=collectd_proc.returncode) +
                                        "Check collectd's log in {collectd_basedir} for more information. ".
@@ -221,6 +221,11 @@ class CollectdExt:
                     self._stop_requested = True
 
             self._logger.info('collectd listener stopped')
+        except Exception as err:
+            self._logger.error('Fatal error in collectd_ext: {error_name}: {error_str}'.
+                               format(error_name=type(err).__name__, error_str=str(err)))
+            self._logger.error(traceback.format_exc())
+            raise err
         finally:
             if collectd_proc is not None:
                 self._logger.debug('Sending SIGTERM to the collectd subprocess...')
