@@ -80,7 +80,8 @@ class Getter(GetterExtensionBase):
     def _on_receiving_nginx_data(self, host, plugin, parts):
         assert plugin == 'nginx'
         # Packets are separated by the Host part.
-        plugin_instance = None
+        # plugin_instance is either not used or just empty for NGINX plugin
+        # plugin_instance = None
         ts = None
         type = None
         type_instance = None
@@ -98,8 +99,8 @@ class Getter(GetterExtensionBase):
                     assert len(self._current_pi_raw_data) == 0
                 self._last_pi_data_ts = ts
             elif part_type == collectd_proto.PART_TYPE_PLUGIN_INSTANCE:
-                assert isinstance(part_data, str)
-                plugin_instance = int(part_data)
+                # plugin_instance is either not used or just empty for NGINX plugin
+                pass
             elif part_type == collectd_proto.PART_TYPE_TYPE:
                 assert isinstance(part_data, str)
                 type = part_data

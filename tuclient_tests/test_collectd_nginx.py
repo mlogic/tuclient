@@ -82,7 +82,7 @@ class TestCollectdNGINX(unittest.TestCase):
             collectd_nginx.start()
             collectd_nginx._on_receiving_nginx_data('host1', 'nginx',
                                                     [(0, 'freesia'), (8, 1552443773.4047103), (9, 1073741824),
-                                                     (2, 'nginx'), (4, 'nginx_connections'), (5, 'active'),
+                                                     (2, 'nginx'), (3, ''), (4, 'nginx_connections'), (5, 'active'),
                                                      (6, [(1, 1.0)]), (8, 1552443773.404723), (4, 'connections'),
                                                      (5, 'handled'), (6, [(2, 8)]), (8, 1552443773.404735),
                                                      (4, 'nginx_connections'), (5, 'reading'), (6, [(1, 0.0)]),
