@@ -45,14 +45,14 @@ class CollectdExt:
         self._logger = logger
         self._started = False
         self._stop_requested = False
-        # We use a member-wise buffer for the rare case that one socket.recv() only
+        # We use a member-wise buffer for the rare case that one socket.recv() call only
         # received a half of packet.
         self._buf = b''
         self._plugins = []
         # The last plugin from previous batch of parts received
-        self._previous_plugin = None
+        self._last_plugin = None
         # The last ts from the previous batch of parts received
-        self._last_ts_from_previous_packet = None
+        self._last_ts = None
         self._callbacks = dict()
         self._thread = None
         if collectd_conf_template is None:
@@ -154,8 +154,8 @@ class CollectdExt:
         # Packets are separated by the Host part.
         host = None
         parts_for_plugins = dict()
-        no_plugin_parts = []
-        last_ts = None
+        # A list of parts that we will be adding to a specific plugin's buffer
+        pending_parts = []
 
         for part_type, part_data in parts:
             if part_type == tuclient_extensions.collectd_proto.PART_TYPE_HOST:
@@ -163,30 +163,36 @@ class CollectdExt:
                 host = part_data
             elif part_type == tuclient_extensions.collectd_proto.PART_TYPE_PLUGIN:
                 assert isinstance(part_data, str)
-                self._previous_plugin = part_data
+                self._last_plugin = part_data
+                # When switching to sending parts to another plugin, we always prepend the parts
+                # with the current ts, because the new plugin requires the ts and collectd omits
+                # sending out ts when the ts is the same as ts from the previous plugin.
+                if self._last_ts is not None:
+                    pending_parts.append((tuclient_extensions.collectd_proto.PART_TYPE_TIME_HR, self._last_ts))
             elif part_type == tuclient_extensions.collectd_proto.PART_TYPE_TIME_HR:
                 assert isinstance(part_data, float)
-                last_ts = part_data
+                self._last_ts = part_data
 
             # Add this part to per-plugin dict
-            if self._previous_plugin is None:
-                no_plugin_parts.append((part_type, part_data))
+            if self._last_plugin is None:
+                pending_parts.append((part_type, part_data))
             else:
-                if self._previous_plugin in parts_for_plugins:
-                    parts_for_plugins[self._previous_plugin].append((part_type, part_data))
+                if len(pending_parts) > 0:
+                    new_data = pending_parts + [(part_type, part_data)]
+                    pending_parts = []
                 else:
-                    parts_for_plugins[self._previous_plugin] = no_plugin_parts + [(part_type, part_data)]
-                    no_plugin_parts = []
+                    new_data = [(part_type, part_data)]
+                if self._last_plugin in parts_for_plugins:
+                    parts_for_plugins[self._last_plugin].extend(new_data)
+                else:
+                    parts_for_plugins[self._last_plugin] = new_data
 
         for plugin, parts in parts_for_plugins.items():
             if plugin in self._callbacks:
                 for cb in self._callbacks[plugin]:
-                    cb(host, plugin, parts, self._last_ts_from_previous_packet)
+                    cb(host, plugin, parts)
             else:
                 self._logger.warning(f'Received data from plugin {plugin} but not callbacks registered for it')
-
-        # Update previous_ts
-        self._last_ts_from_previous_packet = last_ts
 
     def _thread_func(self):
         listen_addr = '127.0.0.1'
@@ -260,7 +266,10 @@ class CollectdExt:
             self._logger.debug('A collectd_ext thread is already running')
 
     def stop(self):
-        self._stop_requested = True
+        if self.is_alive():
+            self._stop_requested = True
+            self._thread.join()
+            self._thread = None
 
     def is_alive(self):
         return self._started
@@ -280,3 +289,15 @@ def get_collectd_ext_instance(logger):
     else:
         logger.debug('Reusing the existing CollectdExt instance')
     return _collectd_inst
+
+
+def destroy_collectd_ext_instance():
+    """Destroy the global collectd_ext instance
+
+    This function is used to destroy the global collectd_ext instance that was
+    created by get_collectd_ext_instance(). You don't need to call this if your
+    program is exiting normally. This is usually only needed by test cases who
+    need to create and destroy multiple collectd_ext instance."""
+    global _collectd_inst
+    _collectd_inst.stop()
+    _collectd_inst = None

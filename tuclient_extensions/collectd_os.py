@@ -53,10 +53,10 @@ class Getter(GetterExtensionBase):
         self._num_cpu = None
         self._num_cpu_type_instances = None
 
-    def _on_receiving_cpu_data(self, host, plugin, parts, last_ts_from_previous_packet=None):
+    def _on_receiving_cpu_data(self, host, plugin, parts):
         assert plugin == 'cpu'
         plugin_instance = None
-        ts = last_ts_from_previous_packet
+        ts = None
         type = None
         type_instance = None
         # Number of values collected for the current period
@@ -170,6 +170,8 @@ class Getter(GetterExtensionBase):
         # type: () -> List[str]
         """Return the list of all Performance Indicator names"""
         while self._last_cpu_jiffies is None:
+            if not self._collectd.is_alive():
+                raise RuntimeError('collectd thread is dead')
             time.sleep(0.01)
         pis = []
         for cpu_id in sorted(self._last_cpu_jiffies.keys()):

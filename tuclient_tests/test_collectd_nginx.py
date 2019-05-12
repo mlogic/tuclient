@@ -81,7 +81,7 @@ class TestCollectdNGINX(unittest.TestCase):
             self._records_received = 0
             collectd_nginx.start()
             collectd_nginx._on_receiving_nginx_data('host1', 'nginx',
-                                                    [(0, 'freesia'), (9, 1073741824),
+                                                    [(0, 'freesia'), (8, 1552443773.4047103), (9, 1073741824),
                                                      (2, 'nginx'), (3, ''), (4, 'nginx_connections'), (5, 'active'),
                                                      (6, [(1, 1.0)]), (8, 1552443773.404723), (4, 'connections'),
                                                      (5, 'handled'), (6, [(2, 8)]), (8, 1552443773.404735),
@@ -101,8 +101,7 @@ class TestCollectdNGINX(unittest.TestCase):
                                                      (5, 'writing'), (6, [(1, 1.0)]), (8, 1552443774.4031565),
                                                      (5, 'waiting'), (6, [(1, 0.0)]), (8, 1552443774.4030101),
                                                      (5, 'reading'), (6, [(1, 0.0)]), (8, 1552443774.4030035),
-                                                     (4, 'connections'), (5, 'handled'), (6, [(2, 8)])],
-                                                    last_ts_from_previous_packet=1552443773.4047103)
+                                                     (4, 'connections'), (5, 'handled'), (6, [(2, 8)])])
             self.assertListEqual([-0.76, -1.0, -1.0, -0.98, -1.0, -1.0, -0.98, -0.98], collectd_nginx.collect())
         finally:
             if collectd_nginx is not None:

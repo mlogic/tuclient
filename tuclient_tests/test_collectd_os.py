@@ -68,7 +68,7 @@ class TestCollectdOS(unittest.TestCase):
             self._records_received = 0
             collectd_os.start()
             collectd_os._on_receiving_cpu_data('host_a', 'cpu',
-                                               [(0, 'host_a'), (9, 1073741824), (2, 'cpu'),
+                                               [(0, 'host_a'), (8, 1552233781.7930737), (9, 1073741824), (2, 'cpu'),
                                                 (3, '0'), (4, 'cpu'), (5, 'user'),
                                                 (6, [(2, 285758)]), (8, 1552233781.7930973), (3, '5'),
                                                 (6, [(2, 265177)]), (8, 1552233781.7931006),
@@ -124,9 +124,7 @@ class TestCollectdOS(unittest.TestCase):
                                                 (6, [(2, 0)]), (8, 1552233781.7937143),
                                                 (3, '1'), (6, [(2, 0)]), (8, 1552233781.7937152), (3, '2'),
                                                 (6, [(2, 0)]), (8, 1552233781.7933753),
-                                                (3, '4'), (5, 'nice'), (6, [(2, 66966)])],
-                                               last_ts_from_previous_packet=1552233781.7930737
-                                               )
+                                                (3, '4'), (5, 'nice'), (6, [(2, 66966)])])
             collectd_os._on_receiving_cpu_data('host_a', 'cpu',
                                                [(0, 'host_a'), (8, 1552233781.793716), (9, 1073741824), (2, 'cpu'),
                                                 (3, '3'), (4, 'cpu'), (5, 'steal'), (6, [(2, 0)]),
