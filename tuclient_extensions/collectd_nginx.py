@@ -109,7 +109,10 @@ class Getter(GetterExtensionBase):
                 type_instance = part_data
             elif part_type == collectd_proto.PART_TYPE_VALUES:
                 assert len(part_data) == 1
-                data_name = f'{type}_{type_instance}' if type_instance != '' else type
+                if type_instance is None or type_instance == '':
+                    data_name = type
+                else:
+                    data_name = '{type}_{type_instance}'.format(type=type, type_instance=type_instance)
                 assert part_data[0][0] == Getter.EXPECTED_DATA_TYPES[data_name]
                 self._current_pi_raw_data[data_name] = part_data[0][1]
                 if len(self._current_pi_raw_data) == 8:
