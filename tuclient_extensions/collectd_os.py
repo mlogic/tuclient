@@ -128,11 +128,11 @@ class Getter(GetterExtensionBase):
                     self._logger.debug('current_cpu_jiffies: {current_cpu_jiffies}'.format(
                         current_cpu_jiffies=self._current_cpu_jiffies))
                     jiffies_diff = dict()
-                    for cpu_id in self._last_cpu_jiffies:
-                        jiffies_diff[cpu_id] = dict()
-                        for type_instance in self._last_cpu_jiffies[cpu_id]:
-                            jiffies_diff[cpu_id][type_instance] = self._current_cpu_jiffies[cpu_id][type_instance] - \
-                                                                  self._last_cpu_jiffies[cpu_id][type_instance]
+                    for _cpu_id in self._last_cpu_jiffies:
+                        jiffies_diff[_cpu_id] = dict()
+                        for _type_instance in self._last_cpu_jiffies[_cpu_id]:
+                            jiffies_diff[_cpu_id][_type_instance] = self._current_cpu_jiffies[_cpu_id][_type_instance] - \
+                                                                    self._last_cpu_jiffies[_cpu_id][_type_instance]
                     self._last_cpu_jiffies = self._current_cpu_jiffies
                     self._current_cpu_jiffies = dict()
                     self._current_cpu_jiffies_num_of_values = 0

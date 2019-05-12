@@ -251,11 +251,12 @@ class CollectdExt:
             if collectd_proc is not None:
                 self._logger.info('Waiting for the collectd subprocess to stop...')
                 collectd_proc.wait()
+                self._logger.info('The collectd subprocess is stopped.')
             self._started = False
 
     def start(self):
         if self._thread is None:
-            self._logger.debug('Starting a new collectd_ext thread')
+            self._logger.debug('Starting a new collectd_ext thread...')
             self._thread = threading.Thread(target=self._thread_func)
             self._thread.start()
             while not self._started:
