@@ -275,6 +275,7 @@ class CollectdExt:
         return self._started
 
     def __del__(self):
+        self._collectd_log_file.close()
         if self._thread is not None:
             self._thread.join()
             self._thread = None
