@@ -53,10 +53,10 @@ class Getter(GetterExtensionBase):
         self._num_cpu = None
         self._num_cpu_type_instances = None
 
-    def _on_receiving_cpu_data(self, host, plugin, parts):
+    def _on_receiving_cpu_data(self, host, plugin, parts, last_ts_from_previous_packet=None):
         assert plugin == 'cpu'
         plugin_instance = None
-        ts = None
+        ts = last_ts_from_previous_packet
         type = None
         type_instance = None
         # Number of values collected for the current period

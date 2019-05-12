@@ -49,6 +49,10 @@ class CollectdExt:
         # received a half of packet.
         self._buf = b''
         self._plugins = []
+        # The last plugin from previous batch of parts received
+        self._previous_plugin = None
+        # The last ts from the previous batch of parts received
+        self._last_ts_from_previous_packet = None
         self._callbacks = dict()
         self._thread = None
         if collectd_conf_template is None:
@@ -146,12 +150,12 @@ class CollectdExt:
             else:
                 return result
 
-    def _process_packets(self, parts):
+    def _process_packet(self, parts):
         # Packets are separated by the Host part.
         host = None
-        plugin = None
         parts_for_plugins = dict()
         no_plugin_parts = []
+        last_ts = None
 
         for part_type, part_data in parts:
             if part_type == tuclient_extensions.collectd_proto.PART_TYPE_HOST:
@@ -159,24 +163,30 @@ class CollectdExt:
                 host = part_data
             elif part_type == tuclient_extensions.collectd_proto.PART_TYPE_PLUGIN:
                 assert isinstance(part_data, str)
-                plugin = part_data
+                self._previous_plugin = part_data
+            elif part_type == tuclient_extensions.collectd_proto.PART_TYPE_TIME_HR:
+                assert isinstance(part_data, float)
+                last_ts = part_data
 
             # Add this part to per-plugin dict
-            if plugin is None:
+            if self._previous_plugin is None:
                 no_plugin_parts.append((part_type, part_data))
             else:
-                if plugin in parts_for_plugins:
-                    parts_for_plugins[plugin].append((part_type, part_data))
+                if self._previous_plugin in parts_for_plugins:
+                    parts_for_plugins[self._previous_plugin].append((part_type, part_data))
                 else:
-                    parts_for_plugins[plugin] = no_plugin_parts + [(part_type, part_data)]
+                    parts_for_plugins[self._previous_plugin] = no_plugin_parts + [(part_type, part_data)]
                     no_plugin_parts = []
 
         for plugin, parts in parts_for_plugins.items():
             if plugin in self._callbacks:
                 for cb in self._callbacks[plugin]:
-                    cb(host, plugin, parts)
+                    cb(host, plugin, parts, self._last_ts_from_previous_packet)
             else:
                 self._logger.warning(f'Received data from plugin {plugin} but not callbacks registered for it')
+
+        # Update previous_ts
+        self._last_ts_from_previous_packet = last_ts
 
     def _thread_func(self):
         listen_addr = '127.0.0.1'
@@ -206,7 +216,7 @@ class CollectdExt:
                 if collectd_socket in rlist:
                     self._buf += self._recv_all_from_sock(collectd_socket)
                     parts, self._buf = tuclient_extensions.collectd_proto.parse_parts(self._buf)
-                    self._process_packets(parts)
+                    self._process_packet(parts)
 
                 # Monitor the status of our collectd subprocess
                 if collectd_proc.poll() is not None:

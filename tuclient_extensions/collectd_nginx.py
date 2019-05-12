@@ -77,12 +77,12 @@ class Getter(GetterExtensionBase):
         # the processed PI data
         self._pi_data = None
 
-    def _on_receiving_nginx_data(self, host, plugin, parts):
+    def _on_receiving_nginx_data(self, host, plugin, parts, last_ts_from_previous_packet=None):
         assert plugin == 'nginx'
         # Packets are separated by the Host part.
         # plugin_instance is either not used or just empty for NGINX plugin
         # plugin_instance = None
-        ts = None
+        ts = last_ts_from_previous_packet
         type = None
         type_instance = None
         # Number of values collected for the current period
