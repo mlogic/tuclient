@@ -79,8 +79,10 @@ class ClusterStatus(Enum):
 
 ClusterStatusToStrMapping = {
     ClusterStatus.OFFLINE: 'Offline',
+    ClusterStatus.ALL_OK: 'Ok',
     ClusterStatus.TUNING_TARGET_REACHED: 'Tuning; training finished',
     ClusterStatus.NOT_SETUP: 'Not setup',
+    ClusterStatus.NODES_MISMATCH: 'Nodes mismatch',
     ClusterStatus.TUNING_TARGET_NOT_REACHED: 'Tuning; training not finished',
     ClusterStatus.CLIENT_CONNECTION_ERROR: 'Cannot connect to all clients',
     ClusterStatus.CLIENT_ERROR: 'One or more client error',
