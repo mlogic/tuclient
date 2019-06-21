@@ -158,6 +158,7 @@ class TestTUClient(unittest.TestCase):
                                                ClientStatus.HANDSHAKE2_UPLOAD_METADATA])
                 start_ts = monotonic_time()
                 while client1_controller.client_status()[3] != ClientStatus.ALL_OK:
+                    time.sleep(0.5)
                     if monotonic_time() - start_ts > 5:
                         print('Timeout. Client1 failed to come online.')
                         os._exit(1)
@@ -170,7 +171,8 @@ class TestTUClient(unittest.TestCase):
                 gw.do_an_action = True
                 # Wait for a collect
                 start_ts = monotonic_time()
-                while _total_collects == 0:
+                while _total_collects == 1:
+                    time.sleep(0.5)
                     if monotonic_time() - start_ts > 5:
                         print('Timeout. Client1 failed to do a collect.')
                         os._exit(1)

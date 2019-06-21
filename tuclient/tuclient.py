@@ -128,6 +128,10 @@ class TUClient:
         self._last_received_ts = 0
         self._status = ClientStatus.OFFLINE
         self._sending_pi_right_away = sending_pi_right_away
+        # Used by steps in the main loop to customize error message
+        self._current_error_msg = None
+        # Whether to force a collection step. Used by collect-after-action (when tick_len == 0).
+        self._force_collect = False
 
         # don't call protocol.connect() because start() may be called in a different process/thread
 
@@ -178,11 +182,8 @@ class TUClient:
         # GC could cause unplanned stall and disrupts precisely timed collection.
         # Disable it and do it manually before sleeping.
         gc.disable()
-        # Used by steps to customize error message
-        current_error_msg = None
-        # Whether to force a collect step asap. Used when tick_len == 0.
         if self._tick_len == 0:
-            force_collect = True
+            self._force_collect = True
         try:
             self._logger.info('Client node {node_name} started'.format(node_name=self._node_name))
             while not self._stopped:
@@ -193,7 +194,7 @@ class TUClient:
                         [ProtocolCode.KEY, self._api_secret_key, self._cluster_name, self._node_name])
                     # Reset the timeout counter after sending out a command
                     self._last_received_ts = monotonic_time()
-                    current_error_msg = 'Failed to connect to the gateway'
+                    self._current_error_msg = 'Failed to connect to the gateway'
                     self._logger.info('Client node {node_name} initiated handshaking. Step 1: authenticating...'.format(node_name=self._node_name))
 
                 if self._status == ClientStatus.ALL_OK:
@@ -213,7 +214,7 @@ class TUClient:
                         if (self._tick_len > 0 and
                             ts - (int(self._last_collect_wall_time) + self._collect_time_decimal) >= self._tick_len - 0.01) \
                                 or \
-                           (self._tick_len == 0 and force_collect):
+                           (self._tick_len == 0 and self._force_collect):
                             # Last collect wall time must be updated *before* collecting to prevent the send time from
                             # slowly drifting away
                             self._logger.debug('Time is reached to do collection. Starting...')
@@ -224,7 +225,7 @@ class TUClient:
                                 # the read collect time to prevent collision.
                                 self._last_collect_wall_time += 1
                             if self._tick_len == 0:
-                                force_collect = False
+                                self._force_collect = False
                             pi_data = []
                             for g in self._getters:
                                 self._logger.debug("Starting to collect data from getter '{getter_name}'".
@@ -282,161 +283,10 @@ class TUClient:
                 else:
                     sleep_second = 1
 
-                sleep_start_ts = monotonic_time()
-                try:
-                    msg = self._msg_queue.get(block=True, timeout=sleep_second)
-                except Empty:
-                    if monotonic_time() - self._last_received_ts > self._network_timeout:
-                        err_msg = 'Received no data in {timeout} seconds. Timeout. Reconnecting...'.\
-                            format(timeout=self._network_timeout)
-                        if current_error_msg is not None:
-                            err_msg = current_error_msg + ' ' + err_msg
-                        raise TUTimeoutError(err_msg)
-                    continue
-                finally:
-                    self._logger.debug('Slept {0} seconds'.format(monotonic_time() - sleep_start_ts))
-                self._last_received_ts = monotonic_time()
-
-                # Remember to use 'continue' after successfully processing requests. Otherwise the default
-                # catch-all warning at the bottom will be triggered.
-                msg_code = msg[1]
-                if msg_code in (ProtocolCode.PI_RECEIVED_OK, ProtocolCode.HEARTBEAT):
-                    continue
-                elif msg_code == ProtocolCode.BAD_MSG:
-                    err_msg = 'Received BAD_MSG reply.'
-                    if len(msg) >= 3:
-                        err_msg = err_msg + ' ' + str(msg[2])
-                    if current_error_msg is not None:
-                        err_msg = current_error_msg + ' ' + err_msg
-                    raise TUCommunicationError(err_msg)
-                elif msg_code == ProtocolCode.WRONG_KEY:
-                    if self._status == ClientStatus.HANDSHAKE1_AUTHENTICATING:
-                        raise KeyError(current_error_msg + ' Please check API secret key. Exiting...')
-                    # For all other status, the default catch all warning below will be issued
-                elif msg_code == ProtocolCode.OK:
-                    if self._status == ClientStatus.HANDSHAKE1_AUTHENTICATING:
-                        self._status = ClientStatus.HANDSHAKE2_UPLOAD_METADATA
-                        self._logger.info(
-                            'Client node {node_name} authenticated with gateway.'.format(node_name=self._node_name))
-                        self._logger.info(
-                            'Client node {node_name} handshake step 2: uploading PI and parameter metadata.'.
-                            format(node_name=self._node_name))
-                        # Send the PI and Parameter Metadata
-                        # Merge all PI names to one list. First element is tuning_goal_name.
-                        pi_metadata = [self._tuning_goal_name]
-                        if self._getters is not None:
-                            for getter in self._getters:
-                                if getter.pi_names is not None:
-                                    assert isinstance(getter.pi_names, list)
-                                    pi_metadata += getter.pi_names
-                        # Merge all parameter names to one list
-                        param_metadata = []
-                        if self._setters is not None:
-                            for setter in self._setters:
-                                if setter.parameter_names is not None:
-                                    assert isinstance(setter.parameter_names, list)
-                                    param_metadata += setter.parameter_names
-
-                        self.timestamp_and_send_list([ProtocolCode.PI_PARAMETER_META, pi_metadata, param_metadata])
-                        # Reset the timeout counter after sending out a command
-                        self._last_received_ts = monotonic_time()
-                        current_error_msg = 'Failed to register PI and parameter metadata.'
-                        continue
-                    elif self._status == ClientStatus.HANDSHAKE2_UPLOAD_METADATA:
-                        self._logger.info(
-                            'Client node {node_name} registered PI and Parameter metadata.'.format(
-                                node_name=self._node_name))
-                        if self._sending_pi_right_away:
-                            self._status = ClientStatus.ALL_OK
-                            self._logger.info('Tuning started right away')
-                        else:
-                            self._status = ClientStatus.TUNING_PAUSED
-                            self._logger.info('Tuning is paused. Waiting for START_TUNING_TO_CLIENT.')
-                        current_error_msg = None
-                        continue
-                elif msg_code == ProtocolCode.ACTION:
-                    actions = msg[2]
-                    self._logger.debug('Performing action ' + str(actions))
-                    for c in self._setters:
-                        # TODO: TUE-224: support different intervals
-                        c.action(-1, actions)
-                    self._logger.debug('Finished performing action.')
-                    self.timestamp_and_send_list([ProtocolCode.ACTION_DONE])
-                    if self._tick_len == 0:
-                        force_collect = True
-                    continue
-                elif msg_code == ProtocolCode.CLIENT_STATUS:
-                    # The ID of the client or CLI tool that was requesting the status report
-                    requesting_client_id_in_hex_str = msg[2]
-                    self._protocol.client_status_reply(requesting_client_id_in_hex_str, self._cluster_name, self._node_name,
-                                                       self._status)
-                    continue
-                elif msg_code == ProtocolCode.CLUSTER_STATUS:
-                    # Query the cluster about its status
-                    requesting_client_id_in_hex_str = msg[2]
-                    self.timestamp_and_send_list([ProtocolCode.CLUSTER_STATUS, requesting_client_id_in_hex_str])
-                    continue
-                elif msg_code == ProtocolCode.CLUSTER_STATUS_REPLY:
-                    # The ID of the client or CLI tool that was requesting the status report
-                    requesting_client_id_in_hex_str = msg[2]
-                    cluster_name = msg[3]
-                    cluster_status = msg[4]
-                    client_list = msg[5]
-                    self._protocol.cluster_status_reply(requesting_client_id_in_hex_str, cluster_name, cluster_status,
-                                                        client_list)
-                    continue
-                elif msg_code == ProtocolCode.START_TUNING:
-                    # A client (such as tlc) has requested us to forward START_TUNING to gateway
-                    desired_node_count = msg[2]
-                    requesting_client_id_in_hex_str = msg[3]
-                    self.timestamp_and_send_list([ProtocolCode.START_TUNING, desired_node_count,
-                                                  requesting_client_id_in_hex_str])
-                    continue
-                elif msg_code == ProtocolCode.START_TUNING_TO_CLIENT:
-                    # START_TUNING_TO_CLIENT could be of length 4 or 2, depending on whether it was sent
-                    # as a reply to a START_TUNING request or when the client registers to the gateway.
-                    if len(msg) == 4:
-                        requesting_client_id_in_hex_str = msg[2]
-                        gateway_node_count = msg[3]
-                        self._protocol.cluster_start_tuning_reply(msg_code, requesting_client_id_in_hex_str,
-                                                                  gateway_node_count)
-                    if self._status == ClientStatus.TUNING_PAUSED:
-                        self._status = ClientStatus.ALL_OK
-                        self._logger.info('Tuning started')
-                    else:
-                        self._sending_pi_right_away = True
-                        self._logger.warning('Received START_TUNING_TO_CLIENT when the client was not paused')
-                    continue
-                elif msg_code == ProtocolCode.START_TUNING_FAILED:
-                    requesting_client_id_in_hex_str = msg[2]
-                    gateway_node_count = msg[3]
-                    self._protocol.cluster_start_tuning_reply(msg_code, requesting_client_id_in_hex_str, gateway_node_count)
-                elif msg_code == ProtocolCode.CLUSTER_NOT_CONFIGURED:
-                    self._logger.info('Cluster not configured yet')
-                    continue
-                elif msg_code == 'DATALENWRONG':
-                    self._logger.error('Client node {node_name} received data length wrong error. Exiting.'
-                                       .format(node_name=self._node_name))
-                    self.stop()
-                    continue
-                elif msg_code == ProtocolCode.NOT_AUTH:
-                    self._logger.error('Client node {node_name} not authenticated. Try reconnecting...'
-                                       .format(node_name=self._node_name))
-                    return
-                elif msg_code == ProtocolCode.BAD_PI_DATA:
-                    self._logger.error('Client node {node_name} received bad PI data error. Exiting.'
-                                       .format(node_name=self._node_name))
-                    self.stop()
-                    continue
-                elif msg_code == ProtocolCode.DUPLICATE_PI_DATA:
-                    self._logger.error('Client node {node_name} received duplicate PI data error.'
-                                       .format(node_name=self._node_name))
-                    continue
-
-                # A cache all for all unexpected messages. Don't put this in an 'else', because that would prevent
-                # us from catch non-matching conditions from deeper ifs above.
-                self._logger.warning('Received unexpected message: {msg}. Client status: {status}.'.format(
-                    msg=str(msg), status=str(self._status)))
+                # We have to process all messages in the queue before doing next collection,
+                # otherwise, a lengthy collection above could prevent the messages in msg_queue from
+                # being processed.
+                self._process_all_messages(sleep_second)
 
             if self.notify_gateway_on_stop:
                 self.timestamp_and_send_list([ProtocolCode.CLIENT_STOP])
@@ -452,6 +302,170 @@ class TUClient:
                 ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
                 ps.print_stats()
                 print(s.getvalue())
+
+    def _process_all_messages(self, sleep_second):
+        while True:
+            sleep_start_ts = monotonic_time()
+            try:
+                if sleep_second > 0:
+                    msg = self._msg_queue.get(block=True, timeout=sleep_second)
+                else:
+                    msg = self._msg_queue.get(block=False)
+            except Empty:
+                if monotonic_time() - self._last_received_ts > self._network_timeout:
+                    err_msg = 'Received no data in {timeout} seconds. Timeout. Reconnecting...'. \
+                        format(timeout=self._network_timeout)
+                    if self._current_error_msg is not None:
+                        err_msg = self._current_error_msg + ' ' + err_msg
+                    raise TUTimeoutError(err_msg)
+                return
+            finally:
+                slept_seconds = monotonic_time() - sleep_start_ts
+                self._logger.debug('Slept {0} seconds'.format(slept_seconds))
+                sleep_second -= slept_seconds
+            self._last_received_ts = monotonic_time()
+
+            # Remember to use 'continue' after successfully processing requests. Otherwise the default
+            # catch-all warning at the bottom will be triggered.
+            self._logger.debug('Received message ' + str(msg))
+            msg_code = msg[1]
+            if msg_code in (ProtocolCode.PI_RECEIVED_OK, ProtocolCode.HEARTBEAT):
+                continue
+            elif msg_code == ProtocolCode.BAD_MSG:
+                err_msg = 'Received BAD_MSG reply.'
+                if len(msg) >= 3:
+                    err_msg = err_msg + ' ' + str(msg[2])
+                if self._current_error_msg is not None:
+                    err_msg = self._current_error_msg + ' ' + err_msg
+                raise TUCommunicationError(err_msg)
+            elif msg_code == ProtocolCode.WRONG_KEY:
+                if self._status == ClientStatus.HANDSHAKE1_AUTHENTICATING:
+                    raise KeyError(self._current_error_msg + ' Please check API secret key. Exiting...')
+                # For all other status, the default catch all warning below will be issued
+            elif msg_code == ProtocolCode.OK:
+                if self._status == ClientStatus.HANDSHAKE1_AUTHENTICATING:
+                    self._status = ClientStatus.HANDSHAKE2_UPLOAD_METADATA
+                    self._logger.info(
+                        'Client node {node_name} authenticated with gateway.'.format(node_name=self._node_name))
+                    self._logger.info(
+                        'Client node {node_name} handshake step 2: uploading PI and parameter metadata.'.format(
+                            node_name=self._node_name))
+                    # Send the PI and Parameter Metadata
+                    # Merge all PI names to one list. First element is tuning_goal_name.
+                    pi_metadata = [self._tuning_goal_name]
+                    if self._getters is not None:
+                        for getter in self._getters:
+                            if getter.pi_names is not None:
+                                assert isinstance(getter.pi_names, list)
+                                pi_metadata += getter.pi_names
+                    # Merge all parameter names to one list
+                    param_metadata = []
+                    if self._setters is not None:
+                        for setter in self._setters:
+                            if setter.parameter_names is not None:
+                                assert isinstance(setter.parameter_names, list)
+                                param_metadata += setter.parameter_names
+
+                    self.timestamp_and_send_list([ProtocolCode.PI_PARAMETER_META, pi_metadata, param_metadata])
+                    # Reset the timeout counter after sending out a command
+                    self._last_received_ts = monotonic_time()
+                    self._current_error_msg = 'Failed to register PI and parameter metadata.'
+                    continue
+                elif self._status == ClientStatus.HANDSHAKE2_UPLOAD_METADATA:
+                    self._logger.info(
+                        'Client node {node_name} registered PI and Parameter metadata.'.format(
+                            node_name=self._node_name))
+                    if self._sending_pi_right_away:
+                        self._status = ClientStatus.ALL_OK
+                        self._logger.info('Tuning started right away')
+                    else:
+                        self._status = ClientStatus.TUNING_PAUSED
+                        self._logger.info('Tuning is paused. Waiting for START_TUNING_TO_CLIENT.')
+                    self._current_error_msg = None
+                    continue
+            elif msg_code == ProtocolCode.ACTION:
+                actions = msg[2]
+                self._logger.debug('Performing action ' + str(actions))
+                for c in self._setters:
+                    # TODO: TUE-224: support different intervals
+                    c.action(-1, actions)
+                self._logger.debug('Finished performing action.')
+                self.timestamp_and_send_list([ProtocolCode.ACTION_DONE])
+                if self._tick_len == 0:
+                    self._force_collect = True
+                continue
+            elif msg_code == ProtocolCode.CLIENT_STATUS:
+                # The ID of the client or CLI tool that was requesting the status report
+                requesting_client_id_in_hex_str = msg[2]
+                self._protocol.client_status_reply(requesting_client_id_in_hex_str, self._cluster_name, self._node_name,
+                                                   self._status)
+                continue
+            elif msg_code == ProtocolCode.CLUSTER_STATUS:
+                # Query the cluster about its status
+                requesting_client_id_in_hex_str = msg[2]
+                self.timestamp_and_send_list([ProtocolCode.CLUSTER_STATUS, requesting_client_id_in_hex_str])
+                continue
+            elif msg_code == ProtocolCode.CLUSTER_STATUS_REPLY:
+                # The ID of the client or CLI tool that was requesting the status report
+                requesting_client_id_in_hex_str = msg[2]
+                cluster_name = msg[3]
+                cluster_status = msg[4]
+                client_list = msg[5]
+                self._protocol.cluster_status_reply(requesting_client_id_in_hex_str, cluster_name, cluster_status,
+                                                    client_list)
+                continue
+            elif msg_code == ProtocolCode.START_TUNING:
+                # A client (such as tlc) has requested us to forward START_TUNING to gateway
+                desired_node_count = msg[2]
+                requesting_client_id_in_hex_str = msg[3]
+                self.timestamp_and_send_list([ProtocolCode.START_TUNING, desired_node_count,
+                                              requesting_client_id_in_hex_str])
+                continue
+            elif msg_code == ProtocolCode.START_TUNING_TO_CLIENT:
+                # START_TUNING_TO_CLIENT could be of length 4 or 2, depending on whether it was sent
+                # as a reply to a START_TUNING request or when the client registers to the gateway.
+                if len(msg) == 4:
+                    requesting_client_id_in_hex_str = msg[2]
+                    gateway_node_count = msg[3]
+                    self._protocol.cluster_start_tuning_reply(msg_code, requesting_client_id_in_hex_str,
+                                                              gateway_node_count)
+                if self._status == ClientStatus.TUNING_PAUSED:
+                    self._status = ClientStatus.ALL_OK
+                    self._logger.info('Tuning started')
+                else:
+                    self._sending_pi_right_away = True
+                    self._logger.warning('Received START_TUNING_TO_CLIENT when the client was not paused')
+                continue
+            elif msg_code == ProtocolCode.START_TUNING_FAILED:
+                requesting_client_id_in_hex_str = msg[2]
+                gateway_node_count = msg[3]
+                self._protocol.cluster_start_tuning_reply(msg_code, requesting_client_id_in_hex_str, gateway_node_count)
+            elif msg_code == ProtocolCode.CLUSTER_NOT_CONFIGURED:
+                self._logger.info('Cluster not configured yet')
+                continue
+            elif msg_code == 'DATALENWRONG':
+                self._logger.error('Client node {node_name} received data length wrong error. Exiting.'
+                                   .format(node_name=self._node_name))
+                self.stop()
+                continue
+            elif msg_code == ProtocolCode.NOT_AUTH:
+                self._logger.error('Client node {node_name} not authenticated. Try reconnecting...'
+                                   .format(node_name=self._node_name))
+                return
+            elif msg_code == ProtocolCode.BAD_PI_DATA:
+                self._logger.error('Client node {node_name} received bad PI data error. Exiting.'
+                                   .format(node_name=self._node_name))
+                self.stop()
+                continue
+            elif msg_code == ProtocolCode.DUPLICATE_PI_DATA:
+                self._logger.error('Client node {node_name} received duplicate PI data error.'
+                                   .format(node_name=self._node_name))
+                continue
+
+            # A cache all for all unexpected messages. Don't put this in an 'else', because that would prevent
+            # us from catch non-matching conditions from deeper ifs above.
+            self._logger.warning('Received unexpected message: {msg}. Client status: {status}.'.format(
+                msg=str(msg), status=str(self._status)))
 
     def stop(self):
         self._logger.info('Requesting TUClient to stop...')
