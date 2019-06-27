@@ -61,12 +61,32 @@ class Getter(GetterExtensionBase):
         type_instance = None
         # Number of values collected for the current period
 
-        self._logger.debug('Received parts: ' + str(parts))
+        self._logger.debug('Received CPU parts: ' + str(parts))
 
         for part_type, part_data in parts:
             if part_type == tuclient_extensions.collectd_proto.PART_TYPE_TIME_HR:
                 assert isinstance(part_data, float)
                 ts = part_data
+            elif part_type == collectd_proto.PART_TYPE_PLUGIN_INSTANCE:
+                assert isinstance(part_data, str)
+                plugin_instance = int(part_data)
+            elif part_type == collectd_proto.PART_TYPE_TYPE:
+                assert isinstance(part_data, str)
+                type = part_data
+            elif part_type == collectd_proto.PART_TYPE_TYPE_INSTANCE:
+                assert isinstance(part_data, str)
+                type_instance = part_data
+            elif part_type == collectd_proto.PART_TYPE_VALUES:
+                assert len(part_data) == 1
+                assert part_data[0][0] == collectd_proto.DATA_TYPE_DERIVE
+                assert isinstance(part_data[0][1], int)
+
+                # Check if this is the first time we have received full data for one collection period/
+                # We used to do this up in the section where we process PART_TYPE_TIME_HR, but sometimes
+                # we receive a trailing PART_TYPE_TIME_HR without data, which could disrupt the detection
+                # of time gap, so we do it here. See test_parsing_data_bug_2() for a test sample. Now
+                # we only consider a PART_TYPE_TIME_HR part to be valid when it is followed by a VALUE
+                # part.
                 if self._last_cpu_jiffies_time is not None and ts - self._last_cpu_jiffies_time > 0.9:
                     # Next collection period has began
                     if self._last_cpu_jiffies is None:
@@ -95,19 +115,7 @@ class Getter(GetterExtensionBase):
                         assert len(self._current_cpu_jiffies) == 0
                 self._last_cpu_jiffies_time = ts
 
-            elif part_type == collectd_proto.PART_TYPE_PLUGIN_INSTANCE:
-                assert isinstance(part_data, str)
-                plugin_instance = int(part_data)
-            elif part_type == collectd_proto.PART_TYPE_TYPE:
-                assert isinstance(part_data, str)
-                type = part_data
-            elif part_type == collectd_proto.PART_TYPE_TYPE_INSTANCE:
-                assert isinstance(part_data, str)
-                type_instance = part_data
-            elif part_type == collectd_proto.PART_TYPE_VALUES:
-                assert len(part_data) == 1
-                assert part_data[0][0] == collectd_proto.DATA_TYPE_DERIVE
-                assert isinstance(part_data[0][1], int)
+
                 cpu_id = int(plugin_instance)
                 if cpu_id not in self._current_cpu_jiffies:
                     self._current_cpu_jiffies[cpu_id] = dict()

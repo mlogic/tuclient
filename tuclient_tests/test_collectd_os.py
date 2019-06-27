@@ -684,6 +684,7 @@ class TestCollectdOS(unittest.TestCase):
         """Test a bug where data of the same type instance could appear twice in a short time span"""
         collectd_os = None
         try:
+            self._logger.setLevel(logging.ERROR)
             collectd_os = Getter(self._logger, 'freesia', collectd_instance=MockCollectd())
             self._records_received = 0
             collectd_os.start()
@@ -723,6 +724,37 @@ class TestCollectdOS(unittest.TestCase):
                                                 (6, [(2, 122953)]), (8, 1561609237.6356404), (5, 'steal'),
                                                 (6, [(2, 0)]), (8, 1561609237.635641), (5, 'idle'), (6, [(2, 1921056)]),
                                                 (8, 1561609237.6437924)])
+        finally:
+            collectd_os.stop()
+
+    def test_parsing_data_bug_2(self):
+        """Test a bug where a trailing (8, a) packet prevents finishing of first collection being detected properly"""
+        collectd_os = None
+        try:
+            collectd_os = Getter(self._logger, 'freesia', collectd_instance=MockCollectd())
+            self._records_received = 0
+            collectd_os.start()
+            collectd_os._on_receiving_cpu_data('freesia', 'cpu',
+                                               [(0, 'freesia'), (8, 1561668647.6878629), (2, 'cpu'), (3, '0'),
+                                                (4, 'cpu'), (5, 'user'), (6, [(2, 3418)]), (8, 1561668647.6878736),
+                                                (5, 'system'), (6, [(2, 2221)]), (8, 1561668647.6878772), (5, 'wait'),
+                                                (6, [(2, 2133)]), (8, 1561668647.68788), (5, 'nice'), (6, [(2, 304)]),
+                                                (8, 1561668647.6878862), (5, 'interrupt'), (6, [(2, 0)]),
+                                                (8, 1561668647.6878889), (5, 'softirq'), (6, [(2, 218)]),
+                                                (8, 1561668647.6878893), (5, 'steal'), (6, [(2, 0)]),
+                                                (8, 1561668647.6878898), (5, 'idle'), (6, [(2, 11967)]),
+                                                (8, 1561668648.3175874)])
+            collectd_os._on_receiving_cpu_data('freesia', 'cpu',
+                                               [(0, 'freesia'), (8, 1561668648.6877723), (2, 'cpu'), (3, '0'),
+                                                (4, 'cpu'), (5, 'user'), (6, [(2, 3426)]), (8, 1561668648.6877816),
+                                                (5, 'system'), (6, [(2, 2234)]), (8, 1561668648.6877851), (5, 'wait'),
+                                                (6, [(2, 2136)]), (8, 1561668648.6877885), (5, 'nice'), (6, [(2, 304)]),
+                                                (8, 1561668648.6877913), (5, 'interrupt'), (6, [(2, 0)]),
+                                                (8, 1561668648.687794), (5, 'softirq'), (6, [(2, 224)]),
+                                                (8, 1561668648.687795), (5, 'steal'), (6, [(2, 0)]),
+                                                (8, 1561668648.6877964), (5, 'idle'), (6, [(2, 12038)]),
+                                                (8, 1561668649.3174896)])
+            self.assertEqual(1, collectd_os._num_cpu)
         finally:
             collectd_os.stop()
 
