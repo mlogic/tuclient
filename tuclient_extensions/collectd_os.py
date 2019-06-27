@@ -113,11 +113,12 @@ class Getter(GetterExtensionBase):
                     self._current_cpu_jiffies[cpu_id] = dict()
                 # Data of the same type_instance shouldn't be received twice
                 if type_instance in self._current_cpu_jiffies[cpu_id]:
-                    err_msg = 'Error: type instance "{type_instance}" appeared twice for CPU {cpu_id} at time {ts}'\
+                    err_msg = 'Warning: type instance "{type_instance}" appeared twice for CPU {cpu_id} at time {ts}'\
                         .format(type_instance=type_instance, cpu_id=cpu_id, ts=ts)
-                    self._logger.error(err_msg)
-                    self._logger.error('Received parts: ' + str(parts))
-                    raise ValueError(err_msg)
+                    self._logger.warning(err_msg)
+                    self._logger.warning('Received parts: ' + str(parts))
+                    # Don't raise error because this could happen every few hours for unknown reasons.
+                    # raise ValueError(err_msg)
                 self._current_cpu_jiffies[cpu_id][type_instance] = part_data[0][1]
                 self._current_cpu_jiffies_num_of_values += 1
                 if self._last_cpu_jiffies is not None and self._current_cpu_jiffies_num_of_values == \
