@@ -21,6 +21,7 @@ __copyright__ = 'Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
+import grp
 import logging
 import os
 import select
@@ -125,6 +126,7 @@ class CollectdExt:
             conf_str = f.read()
             conf_str = conf_str.replace('{% plugins %}', plugin_conf)
             conf_str = conf_str.replace('{% basedir %}', self._collectd_basedir)
+            conf_str = conf_str.replace('{% usergroup %}', grp.getgrgid(os.getegid())[0])
             if self._in_snap:
                 conf_str = conf_str.replace('{% plugindir %}', os.path.join(os.environ['SNAP'], 'usr/lib/collectd'))
                 conf_str = conf_str.replace('{% typesdb %}', os.path.join(os.environ['SNAP'],

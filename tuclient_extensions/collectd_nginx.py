@@ -33,14 +33,14 @@ class Getter(GetterExtensionBase):
 
     # Make sure the dict keeps its order
     EXPECTED_DATA_TYPES = OrderedDict({
-        'connections_accepted': collectd_proto.DATA_TYPE_DERIVE,
-        'connections_failed': collectd_proto.DATA_TYPE_DERIVE,
-        'connections_handled': collectd_proto.DATA_TYPE_DERIVE,
-        'nginx_connections_active': collectd_proto.DATA_TYPE_GAUGE,
-        'nginx_connections_reading': collectd_proto.DATA_TYPE_GAUGE,
-        'nginx_connections_waiting': collectd_proto.DATA_TYPE_GAUGE,
-        'nginx_connections_writing': collectd_proto.DATA_TYPE_GAUGE,
-        'nginx_requests': collectd_proto.DATA_TYPE_DERIVE,
+        'connections_accepted': (collectd_proto.DATA_TYPE_DERIVE, '_connection_normalize_factor'),
+        'connections_failed': (collectd_proto.DATA_TYPE_DERIVE, '_connection_normalize_factor'),
+        'connections_handled': (collectd_proto.DATA_TYPE_DERIVE, '_connection_normalize_factor'),
+        'nginx_connections_active': (collectd_proto.DATA_TYPE_GAUGE, '_connection_normalize_factor'),
+        'nginx_connections_reading': (collectd_proto.DATA_TYPE_GAUGE, '_connection_normalize_factor'),
+        'nginx_connections_waiting': (collectd_proto.DATA_TYPE_GAUGE, '_connection_normalize_factor'),
+        'nginx_connections_writing': (collectd_proto.DATA_TYPE_GAUGE, '_connection_normalize_factor'),
+        'nginx_requests': (collectd_proto.DATA_TYPE_DERIVE, '_request_normalize_factor'),
     })
 
     def __init__(self, logger, host, config=None, collectd_instance=None):
@@ -57,10 +57,13 @@ class Getter(GetterExtensionBase):
 
         # Default options
         plugin_options = None
-        self._normalize_factor = 100 / 2
+        self._connection_normalize_factor = 1000 / 2
+        self._request_normalize_factor = 10000 / 2
         if config is not None:
-            self._normalize_factor = int(config.get_config().get('collectd_nginx_max_connections',
-                                                                 self._normalize_factor * 2)) / 2
+            self._connection_normalize_factor = int(config.get_config().get('collectd_nginx_max_connections',
+                                                                            self._connection_normalize_factor * 2)) / 2
+            self._request_normalize_factor = int(config.get_config().get('collectd_nginx_max_requests',
+                                                                         self._request_normalize_factor * 2)) / 2
             if 'collectd_nginx_status_url' in config.get_config():
                 plugin_options = f'URL "{config.get_config()["collectd_nginx_status_url"]}"'
             else:
@@ -113,13 +116,13 @@ class Getter(GetterExtensionBase):
                     data_name = type
                 else:
                     data_name = '{type}_{type_instance}'.format(type=type, type_instance=type_instance)
-                assert part_data[0][0] == Getter.EXPECTED_DATA_TYPES[data_name]
+                assert part_data[0][0] == Getter.EXPECTED_DATA_TYPES[data_name][0]
                 self._current_pi_raw_data[data_name] = part_data[0][1]
                 if len(self._current_pi_raw_data) == 8:
                     if self._last_pi_raw_data is not None:
                         pi_data = dict()
                         for data_name, data_type in Getter.EXPECTED_DATA_TYPES.items():
-                            if data_type == collectd_proto.DATA_TYPE_DERIVE:
+                            if data_type[0] == collectd_proto.DATA_TYPE_DERIVE:
                                 pi_data[data_name] = self._current_pi_raw_data[data_name] - \
                                                      self._last_pi_raw_data[data_name]
                             else:
@@ -149,9 +152,15 @@ class Getter(GetterExtensionBase):
 
         outgoing_values = [0] * len(Getter.EXPECTED_DATA_TYPES)
         i = 0
-        for name in Getter.EXPECTED_DATA_TYPES.keys():
-            outgoing_values[i] = clip(self._pi_data[name] / self._normalize_factor - 1, -1, 1)
-            self._logger.debug(f'Collected {name}: {self._pi_data[name]}, normalized to {outgoing_values[i]}')
+        for name, data_type in Getter.EXPECTED_DATA_TYPES.items():
+            normalizer = self.__dict__[data_type[1]]
+            outgoing_values[i] = clip(self._pi_data[name] / normalizer - 1, -1, 1)
+            if self._pi_data[name] > normalizer * 2:
+                self._logger.warning('Collected {name}: {value} is larger than its normalize factor and is normalized to {outgoing_value}. Increase its normalize factor!'.format(
+                    name=name, value=self._pi_data[name], outgoing_value=outgoing_values[i]))
+            else:
+                self._logger.debug('Collected {name}: {value}, normalized to {outgoing_value}'.format(
+                    name=name, value=self._pi_data[name], outgoing_value=outgoing_values[i]))
             i += 1
         self._pi_data = None
         return outgoing_values

@@ -52,17 +52,22 @@ class TestCollectdNGINX(unittest.TestCase):
     def _test_start_stop(self):
         """Test collecting data from an NGINX instance
 
-        You need an NGINX server to run this test. You can start one by
-        using start_test_nginx_docker.sh."""
+        This test is commented out so it won't be run automatically. To run this test,
+        you need to start an NGINX server. You can start one by using
+        start_test_nginx_docker.sh. Don't access the NGINX in the container during
+        the test, because we assume the number of active connection and request are
+        both 1."""
         collectd_nginx = None
         try:
             mock_config = {'collectd_nginx_status_url':
-                           'http://localhost:8080/status',
+                           'http://localhost:8081/status',
                            # Test parsing of collectd_nginx_max_connections from an str
-                           'collectd_nginx_max_connections': '50'}
+                           'collectd_nginx_max_connections': '50',
+                           'collectd_nginx_max_requests': '500'}
             collectd_nginx = Getter(self._logger, 'host1', config=ConfigBase(default=mock_config))
             collectd_nginx.start()
-            self.assertEqual(collectd_nginx._normalize_factor, 25)
+            self.assertEqual(collectd_nginx._connection_normalize_factor, 25)
+            self.assertEqual(collectd_nginx._request_normalize_factor, 250)
             self.assertListEqual(['host1/nginx/connections_accepted', 'host1/nginx/connections_failed',
                                   'host1/nginx/connections_handled', 'host1/nginx/nginx_connections_active',
                                   'host1/nginx/nginx_connections_reading', 'host1/nginx/nginx_connections_waiting',
@@ -70,14 +75,21 @@ class TestCollectdNGINX(unittest.TestCase):
                                  collectd_nginx.pi_names)
             num_pis = len(collectd_nginx.pi_names)
             for _ in range(3):
-                self.assertEqual(num_pis, len(collectd_nginx.collect()))
+                pi = collectd_nginx.collect()
+                self.assertEqual(num_pis, len(pi))
+                self.assertAlmostEqual(-0.96, pi[3])
+                self.assertAlmostEqual(-0.996, pi[7])
         finally:
             collectd_nginx.stop()
 
     def test_parsing_data(self):
         collectd_nginx = None
         try:
-            collectd_nginx = Getter(self._logger, 'host1', collectd_instance=MockCollectd())
+            mock_config = {'collectd_nginx_status_url': 'http://unused/unused',
+                           'collectd_nginx_max_connections': '1000',
+                           'collectd_nginx_max_requests': '10000'}
+            collectd_nginx = Getter(self._logger, 'host1', collectd_instance=MockCollectd(),
+                                    config=ConfigBase(default=mock_config))
             self._records_received = 0
             collectd_nginx.start()
             collectd_nginx._on_receiving_nginx_data('host1', 'nginx',
@@ -102,7 +114,7 @@ class TestCollectdNGINX(unittest.TestCase):
                                                      (5, 'waiting'), (6, [(1, 0.0)]), (8, 1552443774.4030101),
                                                      (5, 'reading'), (6, [(1, 0.0)]), (8, 1552443774.4030035),
                                                      (4, 'connections'), (5, 'handled'), (6, [(2, 8)])])
-            self.assertListEqual([-0.76, -1.0, -1.0, -0.98, -1.0, -1.0, -0.98, -0.98], collectd_nginx.collect())
+            self.assertListEqual([-0.976, -1.0, -1.0, -0.998, -1.0, -1.0, -0.998, -0.9998], collectd_nginx.collect())
         finally:
             if collectd_nginx is not None:
                 collectd_nginx.stop()
