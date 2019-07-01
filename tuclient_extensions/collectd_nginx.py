@@ -90,17 +90,12 @@ class Getter(GetterExtensionBase):
         type_instance = None
         # Number of values collected for the current period
 
-        self._logger.debug('Received parts: ' + str(parts))
+        self._logger.debug('Received NGINX parts: ' + str(parts))
 
         for part_type, part_data in parts:
             if part_type == tuclient_extensions.collectd_proto.PART_TYPE_TIME_HR:
                 assert isinstance(part_data, float)
                 ts = part_data
-                if self._last_pi_data_ts is not None and ts - self._last_pi_data_ts > 0.9:
-                    # Next collection period has began
-                    # self._current_pi_raw_data should have already been processed
-                    assert len(self._current_pi_raw_data) == 0
-                self._last_pi_data_ts = ts
             elif part_type == collectd_proto.PART_TYPE_PLUGIN_INSTANCE:
                 # plugin_instance is either not used or just empty for NGINX plugin
                 pass
@@ -112,6 +107,18 @@ class Getter(GetterExtensionBase):
                 type_instance = part_data
             elif part_type == collectd_proto.PART_TYPE_VALUES:
                 assert len(part_data) == 1
+
+                # We used to do this up in the section where we process PART_TYPE_TIME_HR, but sometimes
+                # we receive a trailing PART_TYPE_TIME_HR without data, which could disrupt the detection
+                # of time gap, so we do it here. See test_collectd_nginx.test_parsing_data_bug_0() for a
+                # test sample. Now we only consider a PART_TYPE_TIME_HR part to be valid when it is
+                # followed by a VALUE part.
+                if self._last_pi_data_ts is not None and ts - self._last_pi_data_ts > 0.9:
+                    # Next collection period has began
+                    # self._current_pi_raw_data should have already been processed
+                    assert len(self._current_pi_raw_data) == 0
+                self._last_pi_data_ts = ts
+
                 if type_instance is None or type_instance == '':
                     data_name = type
                 else:
@@ -127,8 +134,10 @@ class Getter(GetterExtensionBase):
                                                      self._last_pi_raw_data[data_name]
                             else:
                                 pi_data[data_name] = self._current_pi_raw_data[data_name]
-                        # Ready it for collection after it is all finished.
+                        # Ready it for collection after it is all finished. self._pi_data
+                        # must be modified atomically because there's no lock to protect it.
                         self._pi_data = pi_data
+                        self._logger.debug('Finished receiving all NGINX values for current tick')
                     self._last_pi_raw_data = self._current_pi_raw_data
                     self._current_pi_raw_data = dict()
 
@@ -150,19 +159,26 @@ class Getter(GetterExtensionBase):
                 self._logger.error(err_msg)
                 raise RuntimeError(err_msg)
 
+        # Make a copy because self._pi_data could change anytime. No need to
+        # use deepcopy, because self._pi_data will only be changed to point
+        # to another dict, not being modified in any other way.
+        pi_data = self._pi_data
+        # It is ok if self._pi_data is changed after last statement and before
+        # we write None to it, because that would be rare and would only cause us to
+        # lost 1 second's data.
+        self._pi_data = None
         outgoing_values = [0] * len(Getter.EXPECTED_DATA_TYPES)
         i = 0
         for name, data_type in Getter.EXPECTED_DATA_TYPES.items():
             normalizer = self.__dict__[data_type[1]]
-            outgoing_values[i] = clip(self._pi_data[name] / normalizer - 1, -1, 1)
-            if self._pi_data[name] > normalizer * 2:
+            outgoing_values[i] = clip(pi_data[name] / normalizer - 1, -1, 1)
+            if pi_data[name] > normalizer * 2:
                 self._logger.warning('Collected {name}: {value} is larger than its normalize factor and is normalized to {outgoing_value}. Increase its normalize factor!'.format(
-                    name=name, value=self._pi_data[name], outgoing_value=outgoing_values[i]))
+                    name=name, value=pi_data[name], outgoing_value=outgoing_values[i]))
             else:
                 self._logger.debug('Collected {name}: {value}, normalized to {outgoing_value}'.format(
-                    name=name, value=self._pi_data[name], outgoing_value=outgoing_values[i]))
+                    name=name, value=pi_data[name], outgoing_value=outgoing_values[i]))
             i += 1
-        self._pi_data = None
         return outgoing_values
 
     @property

@@ -157,20 +157,35 @@ class Getter(GetterExtensionBase):
     def collect(self):
         # type: () -> List[float]
         """Collect Performance Indicators"""
+        start_ts = monotonic_time()
         while self._last_cpu_jiffies_diff is None:
             if not self._collectd.is_alive():
                 raise RuntimeError('collectd thread is dead')
             time.sleep(0.01)
+            if monotonic_time() - start_ts > 5:
+                err_msg = 'collectd_os.collect() timed out. Please check collectd log for error information'
+                self._logger.error(err_msg)
+                raise RuntimeError(err_msg)
+
+        # Make a copy because self._last_cpu_jiffies_diff could change anytime. No need to
+        # use deepcopy, because self._last_cpu_jiffies_diff will only be changed to point
+        # to another dict, not being modified in any other way.
+        last_cpu_jiffies_diff = self._last_cpu_jiffies_diff
+        # It is ok if self._last_cpu_jiffies_diff is changed after last statement and before
+        # we write None to it, because that would be rare and would only cause us to
+        # lost 1 second's data.
+        self._last_cpu_jiffies_diff = None
+
         # We have data from all plugins. Prepare to send them out.
         outgoing_values = [0] * self._num_cpu * self._num_cpu_type_instances
         i = 0
-        for cpu_id in sorted(self._last_cpu_jiffies_diff.keys()):
-            half_total_jiffies = sum(self._last_cpu_jiffies_diff[cpu_id].values()) / 2
-            for type_instance in sorted(self._last_cpu_jiffies_diff[cpu_id].keys()):
+        for cpu_id in sorted(last_cpu_jiffies_diff.keys()):
+            half_total_jiffies = sum(last_cpu_jiffies_diff[cpu_id].values()) / 2
+            for type_instance in sorted(last_cpu_jiffies_diff[cpu_id].keys()):
                 # Normalize to [-1, 1]
-                outgoing_values[i] = self._last_cpu_jiffies_diff[cpu_id][type_instance] / half_total_jiffies - 1
+                outgoing_values[i] = last_cpu_jiffies_diff[cpu_id][type_instance] / half_total_jiffies - 1
                 i += 1
-        self._last_cpu_jiffies_diff = None
+
         return outgoing_values
 
     @property
