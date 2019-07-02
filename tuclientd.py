@@ -96,6 +96,8 @@ if __name__ == '__main__':
     # These initial values are necessary if exception occurs in config.*()
     node_name = 'Unset'
     cluster_name = 'Unset'
+    setters = []  # type: List[SetterExtensionBase]
+    getters = []  # type: List[GetterExtensionBase]
     try:
         client_id = uuid1()
         try:
@@ -120,7 +122,6 @@ if __name__ == '__main__':
         network_timeout = config.network_timeout()
 
         # Setter modules
-        setters = []   # type: List[SetterExtensionBase]
         setter_module_str = config.setter_module()
         if setter_module_str is not None:
             for setter_module_name in setter_module_str.split(', '):
@@ -133,7 +134,6 @@ if __name__ == '__main__':
             logger.info('No setter is set')
 
         # Getter modules
-        getters = []    # type: List[GetterExtensionBase]
         getter_module_str = config.getter_module()
         if getter_module_str is not None:
             for getter_module_name in getter_module_str.split(', '):
@@ -227,3 +227,9 @@ if __name__ == '__main__':
         logger.error(traceback.format_exc())
         # Don't continue on other errors
         exit(1)
+    finally:
+        for g in getters:
+            g.stop()
+        for s in setters:
+            s.stop()
+        logger.info('Client node {node_name} stopped'.format(node_name=node_name))

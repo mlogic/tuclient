@@ -245,6 +245,7 @@ class ZMQProtocol(ProtocolExtensionBase):
         self._poller.register(self._cmd_socket, zmq.POLLIN)
 
     def _zmq_uninit(self):
+        self._logger.debug('Closing zmq poller sockets...')
         if self._poller is not None:
             if self._cmd_socket is not None:
                 self._poller.unregister(self._cmd_socket)
@@ -257,6 +258,7 @@ class ZMQProtocol(ProtocolExtensionBase):
         if self._cmd_socket is not None:
             self._cmd_socket.close()
             self._cmd_socket = None
+        self._logger.debug('Finished closing zmq poller sockets')
 
     @property
     @overrides(ProtocolExtensionBase)
@@ -331,6 +333,7 @@ class ZMQProtocol(ProtocolExtensionBase):
             zmq_send_to_router(self._logger, self._cmd_socket_addr, [ProtocolCode.EXIT])
             self._poller_thread.join()
             self._poller_thread = None
+            self._logger.info('Poller stopped...')
 
     def client_status(self):
         # type: () -> Tuple[str, str, str, ClientStatus]
