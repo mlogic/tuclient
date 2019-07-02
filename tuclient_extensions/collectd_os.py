@@ -162,7 +162,7 @@ class Getter(GetterExtensionBase):
             if not self._collectd.is_alive():
                 raise RuntimeError('collectd thread is dead')
             time.sleep(0.01)
-            if monotonic_time() - start_ts > 5:
+            if monotonic_time() - start_ts > 20:
                 err_msg = 'collectd_os.collect() timed out. Please check collectd log for error information'
                 self._logger.error(err_msg)
                 raise RuntimeError(err_msg)

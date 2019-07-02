@@ -154,7 +154,9 @@ class Getter(GetterExtensionBase):
             if not self._collectd.is_alive():
                 raise RuntimeError('collectd thread is dead')
             time.sleep(0.01)
-            if monotonic_time() - start_ts > 5:
+            # It could take a long time to read status information from a busy NGINX server.
+            # We've observed as long as 14 seconds.
+            if monotonic_time() - start_ts > 60:
                 err_msg = 'Reading data from NGINX timed out. Please check collectd log for error information'
                 self._logger.error(err_msg)
                 raise RuntimeError(err_msg)
