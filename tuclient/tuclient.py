@@ -187,7 +187,7 @@ class TUClient:
                         [ProtocolCode.KEY, self._api_secret_key, self._cluster_name, self._node_name])
                     # Reset the timeout counter after sending out a command
                     self._last_received_ts = monotonic_time()
-                    self._current_error_msg = 'Failed to connect to the gateway'
+                    self._current_error_msg = 'Failed to connect to the gateway.'
                     self._logger.info('Client node {node_name} initiated handshaking. Step 1: authenticating...'.format(node_name=self._node_name))
 
                 if self._status == ClientStatus.ALL_OK:
