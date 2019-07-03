@@ -120,10 +120,11 @@ class TUClient:
         self._stopped = False
         # Whether we should notify gateway about our stop. Used only in tests.
         self.notify_gateway_on_stop = True
-        # _last_collect_wall_time is initialized to -1 so that, if tick_len == 0, the first
+        # _last_collect_time is initialized to -1 so that, if tick_len == 0, the first
         # ts we use for sending the collected data will be 0.
-        self._last_collect_wall_time = -1
-        self._collect_time_decimal = 0.5  # we always collect at the middle of a second
+        self._last_collect_time = -1
+        self._next_collect_time = 0
+        self._update_next_collect_time()
         # ts when we received last feedback from TUGateway or initiated connects, used for checking timeout.
         self._last_received_ts = 0
         self._status = ClientStatus.OFFLINE
@@ -134,6 +135,12 @@ class TUClient:
         self._force_collect = False
 
         # don't call protocol.connect() because start() may be called in a different process/thread
+
+    def _update_next_collect_time(self):
+        if self._tick_len == 0:
+            # next_collect_time is not used when tick_len is 0
+            return
+        self._next_collect_time = (int(time.time()) // self._tick_len + 1) * self._tick_len
 
     def timestamp_and_send_list(self, data, ts=None):
         # type: (List[Any], float) -> None
@@ -199,25 +206,24 @@ class TUClient:
                         ts = time.time()
                         # Time backflow detection: because we are not using monotonic time, if the user
                         # turns back the wall time, the program might not do collection in a long time.
-                        if self._last_collect_wall_time - ts > self._tick_len > 0:
+                        if self._last_collect_time - ts > self._tick_len > 0:
                             self._logger.info('Time was turned backwards. Doing a collection right now.')
-                            self._last_collect_wall_time = -1
-                        # When self._tick_len > 0, we do a collect step periodically.
+                            self._last_collect_time = -1
+                            self._update_next_collect_time()
+                        # When self._tick_len > 0, we do a collect step at self._next_collect_time.
                         # When self._tick_len == 0, we wait until force_collect.
-                        if (self._tick_len > 0 and
-                            ts - (int(self._last_collect_wall_time) + self._collect_time_decimal) >= self._tick_len - 0.01) \
-                                or \
+                        if (self._tick_len > 0 and ts >= self._next_collect_time) or \
                            (self._tick_len == 0 and self._force_collect):
-                            # Last collect wall time must be updated *before* collecting to prevent the send time from
-                            # slowly drifting away
+                            # last_collect_time and next_collect_time must be updated *before* collecting
+                            # to prevent skipping of a collection if the collection is longer than a tick_len
                             self._logger.debug('Time is reached to do collection. Starting...')
                             if self._tick_len > 0:
-                                self._last_collect_wall_time = ts
+                                self._last_collect_time = ts
+                                self._update_next_collect_time()
                             else:
                                 # When tick_len == 0, we have to use a increasing counter instead of
                                 # the read collect time to prevent collision.
-                                self._last_collect_wall_time += 1
-                            if self._tick_len == 0:
+                                self._last_collect_time += 1
                                 self._force_collect = False
                             pi_data = []
                             for g in self._getters:
@@ -250,14 +256,14 @@ class TUClient:
 
                                 # First element of the outgoing list is tuning_goal
                                 self.timestamp_and_send_list([ProtocolCode.PI, [tuning_goal] + pi_data],
-                                                             ts=self._last_collect_wall_time)
+                                                             ts=self._last_collect_time)
                                 # We don't wait for 'OK' to save time
                         else:
                             self._logger.debug('Collection time is not reached yet')
                             pass
                     else:
                         self._logger.debug('No getter is set. Skipped collecting.')
-                        self._last_collect_wall_time = time.time()
+                        self._last_collect_time = time.time()
 
                 gc.collect()
                 flush_log()
@@ -270,9 +276,7 @@ class TUClient:
                 if self._status == ClientStatus.ALL_OK and self._getters is not None and len(self._getters) > 0 and \
                         self._tick_len > 0:
                     # Calculate the precise time for next collection
-                    sleep_second = int(self._last_collect_wall_time) + self._collect_time_decimal + self._tick_len - \
-                                   time.time()
-                    sleep_second = max(sleep_second, 0)
+                    sleep_second = max(self._next_collect_time - time.time(), 0)
                 else:
                     sleep_second = 1
 
