@@ -28,16 +28,19 @@ import re
 from tuclient import *
 # typing.NamedTuple is better than collections.namedtuple because the former allows
 # setting the types of fields.
-from typing import Callable, Dict, List, NamedTuple
+from typing import Callable, Dict, List, NamedTuple, Set
 
 
 # We can't use the following better format because we need to support Python 2
 #    name: str
-#    set_func: Callable
-# set_func is a callable for setting a parameter according to a float value between -1 and 1.
-ParameterInfo = NamedTuple('ParameterInfo', [('name', str), ('set_func', Callable), ('post_set_func_index', int)])
-ConfigFileChangeAction = NamedTuple('ConfigFileChangeAction', [('line_regex_obj', object), ('new_line', str),
-                                                               ('param_value', str)])
+#    calc_param_value_func: Callable
+# calc_param_value_func is a callable for calculating the actual parameter value
+# from the float value between -1 and 1 that we receive from the engine.
+ParameterInfo = NamedTuple('ParameterInfo', [('full_name', str),
+                                             ('short_name', str),
+                                             ('config_file', str),
+                                             ('calc_param_value_func', Callable),
+                                             ('post_set_func_index', int)])
 # The mapping from an action's index to its post_set function's index
 ActionIndexToPostSetFuncIndexMap = Dict[int, int]
 
@@ -73,35 +76,50 @@ class Setter(SetterExtensionBase):
                         'for common_setters_config_files.')
             config = ConfigFile(logger, 'client', host, config_file, config.get_config())
 
-        # Used by `_config_file_set_func()`
-        self._config_file_change_queue = dict()  # type: Dict[str, List[ConfigFileChangeAction]]
-
         # Load settings for the common setters from config. Parameters are ground by their
         # intervals.
         parameter_names = config.get_config()['common_setters_params'].split(', ')
         parameter_names.sort()
         # Parameters grouped by interval
-        self._parameters = dict()      # type: Dict[int, List[ParameterInfo]]
+        self._parameters = dict()                      # type: Dict[int, List[ParameterInfo]]
+        # A map from config file names to config file data
+        self._config_file_data_map = dict()            # type: Dict[str, str]
+        # Set of config file names grouped by interval
+        self._config_file_sets = dict()                # type: Dict[int, Set[str]]
         # A list of all post_set_funcs' callable objects. A parameter stores an index to refer
         # to tis post_set_func inside this list. By doing this, we are able to call each
         # post_set_func only once even when more than one parameter uses the same
         # post_set_func.
-        self._post_set_funcs = []      # type: List[Callable]
+        self._post_set_funcs = []                      # type: List[Callable]
         func_name_to_post_set_func_index_map = dict()  # type: Dict[str, int]
+        # A map from parameter short names to values. Filled by _config_file_set_func()
+        # each time new values are received. This map is used to calculate some
+        # dependent parameter values, such as values that are calculated from other
+        # parameter values. This map is used by _commit_config_file_changes.
+        self._parameter_value_map = dict()             # type: Dict[str, Any]
 
         for name in parameter_names:
             interval = int(config.get_config()[name + '_interval'])
             if interval not in self._parameters:
                 self._parameters[interval] = []
+            if interval not in self._config_file_sets:
+                self._config_file_sets[interval] = set()
             # Does this parameter require a config file?
             if name + '_config_file' in config.get_config():
                 config_file = config.get_config()[name + '_config_file']
-                # Test if the file is readable
-                with open(config_file) as f:
-                    f.read()
+                self._config_file_sets[interval].add(config_file)
+                if config_file not in self._config_file_data_map:
+                    # Read the file data
+                    with open(config_file) as f:
+                        self._config_file_data_map[config_file] = f.read()
                 # Make sure the regex is compilable
                 regex = config.get_config()[name + '_config_line_regex']
                 regex_obj = re.compile(regex, flags=re.MULTILINE)
+                # Read the new line data
+                new_line = config.get_config()[name + '_config_new_line']
+                # Put the new_line into the config file
+                self._config_file_data_map[config_file] = re.sub(regex_obj, new_line,
+                                                                 self._config_file_data_map[config_file])
 
                 if name + '_post_set_func' not in config.get_config():
                     # This parameter has no post_set_func
@@ -128,48 +146,30 @@ class Setter(SetterExtensionBase):
                 else:
                     raise ValueError('Cannot parse candidate values ' + cand_val_str)
 
-                self._parameters[interval].append(ParameterInfo(host+'/'+name, functools.partial(
-                    self._config_file_set_func, calc_param_value_func, config_file, regex_obj,
-                    config.get_config()[name + '_config_new_line']
-                ), post_set_func_index))
+                param_full_name = host + '/' + name
+                logger.info('Loaded parameter information: name {param_full_name}, set interval {interval}, '
+                            'config_file {config_file}, candidate values {cand_val_str}'.format(
+                                param_full_name=param_full_name, interval=interval, config_file=config_file,
+                                cand_val_str=cand_val_str))
+                self._parameters[interval].append(ParameterInfo(param_full_name, name, config_file, calc_param_value_func,
+                                                                post_set_func_index))
             elif name + '_sysctl' in config.get_config():
-                raise NotImplementedError('Common setter {name} requires sysctl interface, which is not implemented yet.')
+                raise NotImplementedError('Common setter {name} requires sysctl interface, which is not implemented '
+                                          'yet.'.format(name=name))
             else:
                 raise ValueError("Common setter {name} doesn't have correct parameter information.")
 
         # Prefix each parameter by our hostname before finishing
         self._parameter_names = [host+'/'+x for x in parameter_names]
 
-    def _config_file_set_func(self, param_value_func, config_file, line_regex_obj, new_line, action_value):
-        # type: (Callable, str, object, str, float) -> None
-        """Set the parameter in a config file
-
-        This function only puts the change into a queue, because we need to group the
-        change to the same configuration file to reduce overhead.
-
-        :param param_value_func: a callable for calculating the parameter value from action value
-        :param config_file: name of the config file
-        :param line_regex_obj: regular expression Pattern object for matching the line to be changed
-        :param new_line: new line to be put into the config file
-        :param action_value: new value for the parameter"""
-        if config_file not in self._config_file_change_queue:
-            self._config_file_change_queue[config_file] = []
-        self._config_file_change_queue[config_file].append(ConfigFileChangeAction(line_regex_obj,
-                                                                                  new_line,
-                                                                                  param_value_func(action_value)))
-
-    def _commit_config_file_changes(self):
-        for config_file, changes in self._config_file_change_queue.items():
-            with open(config_file) as f:
-                file_data = f.read()
-                for change in changes:
-                    # Fill new_line with the actual parameter
-                    new_line = change.new_line.replace('$value$', change.param_value)
-                    # Put the new_line into the config file
-                    file_data = re.sub(change.line_regex_obj, new_line, file_data)
-
+    def _commit_config_file_changes(self, interval):
+        for config_file in self._config_file_sets[interval]:
+            config_file_data = self._config_file_data_map[config_file]
+            for param_name, param_value in self._parameter_value_map.items():
+                config_file_data = config_file_data.replace('$' + param_name + '$',
+                                                            param_value)
             with open(config_file, 'w') as f:
-                f.write(file_data)
+                f.write(config_file_data)
 
     @overrides(SetterExtensionBase)
     def start(self):
@@ -190,17 +190,20 @@ class Setter(SetterExtensionBase):
             assert len(self._parameters) == 1
             interval = list(self._parameters.keys())[0]
         assert len(self._parameters[interval]) == len(actions)
-        assert len(self._config_file_change_queue) == 0
+
         # We use a set to track the index of the post_set_func we need to call,
         # so that we only call each post_set_func once at most.
         post_set_funcs_to_call = set()
+
+        # We do not clear out old parameter values from self._parameter_value_map
+        # each time we receive a new set of actions, because we need to keep
+        # values that are only set in other intervals.
         for param_info, action_value in zip(self._parameters[interval], actions):
-            param_info.set_func(action_value)
+            self._parameter_value_map[param_info.short_name] = param_info.calc_param_value_func(action_value)
             if param_info.post_set_func_index >= 0:
                 post_set_funcs_to_call.add(param_info.post_set_func_index)
-        self._commit_config_file_changes()
-        # Clear the queue after committing changes
-        self._config_file_change_queue = dict()
+        self._commit_config_file_changes(interval)
+
         # Call all unique post_set functions
         for i in post_set_funcs_to_call:
             self._post_set_funcs[i]()
@@ -213,5 +216,4 @@ class Setter(SetterExtensionBase):
         return self._parameter_names
 
     def stop(self):
-        if self._collectd is not None:
-            self._collectd.stop()
+        pass
