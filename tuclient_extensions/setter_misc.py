@@ -74,6 +74,11 @@ def param_value_from_set(param_categories, n, action_values):
 
     # Extract the action values that are related to our group
     group_action_values = action_values[n:n+len(param_categories)]
+    # Use the simple method of max() and index() to find the location
+    # of the action that has the max value. For small lists (people
+    # usually have around 4 to 5 candidate values for one parameter),
+    # this is faster than np.argmax() and max(enumerate()). See
+    # https://stackoverflow.com/questions/6193498/pythonic-way-to-find-maximum-value-and-its-index-in-a-list
     max_val = max(group_action_values)
     max_idx = group_action_values.index(max_val)
 
