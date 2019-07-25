@@ -152,8 +152,11 @@ class Setter(SetterExtensionBase):
                     self._parameter_names.append(param_full_name)
                 else:
                     param_type = 'categorical'
-                    # categorical value
-                    cand_categorical_values = cand_val_str.split(', ')
+                    # Categorical value. Splitted by ',' and stripped of space.
+                    cand_val_str
+                    cand_categorical_values = [x.strip() for x in cand_val_str.split(',')]
+                    if cand_val_str.strip()[-1] == ',':
+                        cand_categorical_values.append('')
                     calc_param_value_func = functools.partial(param_value_from_set, cand_categorical_values)
                     # Add as k = len(cand_categorical_values) parameters
                     for i, cand_value in enumerate(cand_categorical_values):
