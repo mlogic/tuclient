@@ -31,7 +31,7 @@ from threading import Thread
 import time
 import tuclient
 from tuclient import ClientStatus, monotonic_time, run_shell_command
-from tuclient_extensions import common_setters, ZMQProtocol
+from tuclient_extensions import common_setters, param_value_from_set, ZMQProtocol
 from tuclient_extensions.nginx import *
 from tuclient_tests import MockTUGateway
 import unittest
@@ -51,9 +51,10 @@ class TestCommonSetter(unittest.TestCase):
 
     def test_change_config_file(self):
         setter = common_setters.Setter(self._logger, 'host1', self._tuclient_config)
-        self.assertListEqual(['host1/nginx_worker_connections', 'host1/open_file_cache'], setter.parameter_names)
+        self.assertListEqual(['host1/nginx_worker_connections', 'host1/open_file_cache',
+                              'host1/sendfile/on', 'host1/sendfile/off'], setter.parameter_names)
         setter.start()
-        setter.action(10, [-1, 0])
+        setter.action(10, [-1, 0, 0.4, 0.5])
         self.assertTrue(filecmp.cmp(self._tmp_nginx_conf, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                                        'expected_test_common_setter_nginx.conf',)))
 
@@ -98,14 +99,14 @@ class TestCommonSetter(unittest.TestCase):
                         os._exit(1)
 
                 # Send first action
-                gw.action_data = [0.9, 0.8]
+                gw.action_data = [0.9, 0.8, 1, -1]
                 gw.do_an_action = True
                 self._wait_for_file(self._tmp_nginx_conf,
                                     os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                  'expected_test_common_setter_nginx_with_tugateway.conf', ))
 
                 # Send second action
-                gw.action_data = [0.15, -0.5]
+                gw.action_data = [0.15, -0.5, -0.5, 0]
                 gw.do_an_action = True
                 self._wait_for_file(self._tmp_nginx_conf,
                                     os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -113,6 +114,10 @@ class TestCommonSetter(unittest.TestCase):
             finally:
                 client1.stop()
                 client1_thread.join()
+
+    def test_param_value_from_set(self):
+        self.assertEqual('tue',
+                         param_value_from_set(['sun', 'mon', 'tue', 'wed'], 3, [-1, 0, 0.5, 0.1, 0.2, 0.3, -0.1, 0.4]))
 
 
 if __name__ == '__main__':

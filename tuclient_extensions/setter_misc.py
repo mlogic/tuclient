@@ -19,7 +19,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
-from typing import List
+from typing import List, Set
 
 
 def get_proc_cmdline(pid):
@@ -51,8 +51,30 @@ def get_pids(name):
     return result
 
 
-def param_value_from_range(a, b, action_value):
-    # type: (float, float, float) -> str
-    """Convert a float in [-1, 1] to a parameter value"""
+def param_value_from_range(a, b, n, action_values):
+    # type: (float, float, int, List[float]) -> str
+    """Convert a float action_values[n] (within [-1, 1]) to a parameter value"""
     assert a <= b
-    return str(int((b - a) / 2 * (action_value + 1) + a))
+    return str(int((b - a) / 2 * (action_values[n] + 1) + a))
+
+
+def param_value_from_set(param_categories, n, action_values):
+    # type: (List[str], int, List[float]) -> str
+    """Pick a value from the set according to the action value
+
+    We use a 1-of-k encoding for categorical (discrete) parameter values. For example,
+    we have a parameter called 'pick_a_day" and the candidate values are
+    (sun, mon, tue, wed). param_value_from_set() is called four times with
+    the following arguments:
+    param_value_from_set(set, 'pick_a_day', 0, [0.1, 0.2, 0.3, -0.1])
+
+    Then the third value from the set, 'tue', will be picked.
+    """
+    assert n + len(param_categories) <= len(action_values)
+
+    # Extract the action values that are related to our group
+    group_action_values = action_values[n:n+len(param_categories)]
+    max_val = max(group_action_values)
+    max_idx = group_action_values.index(max_val)
+
+    return param_categories[max_idx]

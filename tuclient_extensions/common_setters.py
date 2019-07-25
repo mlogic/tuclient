@@ -37,10 +37,10 @@ from typing import Callable, Dict, List, NamedTuple, Set
 # calc_param_value_func is a callable for calculating the actual parameter value
 # from the float value between -1 and 1 that we receive from the engine.
 ParameterInfo = NamedTuple('ParameterInfo', [('full_name', str),
-                                             ('short_name', str),
-                                             ('config_file', str),
-                                             ('calc_param_value_func', Callable),
-                                             ('post_set_func_index', int)])
+                                             ('short_name', Optional[str]),
+                                             ('config_file', Optional[str]),
+                                             ('calc_param_value_func', Optional[Callable]),
+                                             ('post_set_func_index', Optional[int])])
 # The mapping from an action's index to its post_set function's index
 ActionIndexToPostSetFuncIndexMap = Dict[int, int]
 
@@ -97,6 +97,7 @@ class Setter(SetterExtensionBase):
         # dependent parameter values, such as values that are calculated from other
         # parameter values. This map is used by _commit_config_file_changes.
         self._parameter_value_map = dict()             # type: Dict[str, Any]
+        self._parameter_names = list()
 
         for name in parameter_names:
             interval = int(config.get_config()[name + '_interval'])
@@ -138,29 +139,50 @@ class Setter(SetterExtensionBase):
 
                     post_set_func_index = func_name_to_post_set_func_index_map[post_set_func_name]
 
+                param_full_name = host + '/' + name
                 cand_val_str = config.get_config()[name + '_candidate_values']
                 m = re.match(r"\[(\d+)[, ]*(\d+)\]", cand_val_str)
                 if m is not None:
                     calc_param_value_func = functools.partial(param_value_from_range, float(m.group(1)),
                                                               float(m.group(2)))
+                    param_type = 'range'
+                    self._parameters[interval].append(
+                        ParameterInfo(param_full_name, name, config_file, calc_param_value_func,
+                                      post_set_func_index))
+                    self._parameter_names.append(param_full_name)
                 else:
-                    raise ValueError('Cannot parse candidate values ' + cand_val_str)
+                    param_type = 'categorical'
+                    # categorical value
+                    cand_categorical_values = cand_val_str.split(', ')
+                    calc_param_value_func = functools.partial(param_value_from_set, cand_categorical_values)
+                    # Add as k = len(cand_categorical_values) parameters
+                    for i, cand_value in enumerate(cand_categorical_values):
+                        param_full_name_with_cat_value = param_full_name + '/' + cand_value
+                        self._parameter_names.append(param_full_name_with_cat_value)
+                        if i == 0:
+                            # Only the first is added with full parameter information
+                            self._parameters[interval].append(ParameterInfo(param_full_name_with_cat_value,
+                                                                            name,
+                                                                            config_file,
+                                                                            calc_param_value_func,
+                                                                            post_set_func_index))
 
-                param_full_name = host + '/' + name
-                logger.info('Loaded parameter information: name {param_full_name}, set interval {interval}, '
+                        else:
+                            self._parameters[interval].append(ParameterInfo(param_full_name + '/' + cand_value,
+                                                                            None,
+                                                                            None,
+                                                                            None,
+                                                                            None))
+                logger.info('Loaded {type} parameter: name {param_full_name}, set interval {interval}, '
                             'config_file {config_file}, candidate values {cand_val_str}'.format(
-                                param_full_name=param_full_name, interval=interval, config_file=config_file,
-                                cand_val_str=cand_val_str))
-                self._parameters[interval].append(ParameterInfo(param_full_name, name, config_file, calc_param_value_func,
-                                                                post_set_func_index))
+                                type=param_type, param_full_name=param_full_name, interval=interval,
+                                config_file=config_file, cand_val_str=cand_val_str))
+
             elif name + '_sysctl' in config.get_config():
                 raise NotImplementedError('Common setter {name} requires sysctl interface, which is not implemented '
                                           'yet.'.format(name=name))
             else:
                 raise ValueError("Common setter {name} doesn't have correct parameter information.")
-
-        # Prefix each parameter by our hostname before finishing
-        self._parameter_names = [host+'/'+x for x in parameter_names]
 
     def _commit_config_file_changes(self, interval):
         for config_file in self._config_file_sets[interval]:
@@ -198,10 +220,13 @@ class Setter(SetterExtensionBase):
         # We do not clear out old parameter values from self._parameter_value_map
         # each time we receive a new set of actions, because we need to keep
         # values that are only set in other intervals.
-        for param_info, action_value in zip(self._parameters[interval], actions):
-            self._parameter_value_map[param_info.short_name] = param_info.calc_param_value_func(action_value)
-            if param_info.post_set_func_index >= 0:
-                post_set_funcs_to_call.add(param_info.post_set_func_index)
+        for n, param_info in enumerate(self._parameters[interval]):
+            if param_info.calc_param_value_func is not None:
+                # calc_param_value_func could be None if it is one of the k candidate values
+                # of a categorical parameter.
+                self._parameter_value_map[param_info.short_name] = param_info.calc_param_value_func(n, actions)
+                if param_info.post_set_func_index >= 0:
+                    post_set_funcs_to_call.add(param_info.post_set_func_index)
         self._commit_config_file_changes(interval)
 
         # Call all unique post_set functions
