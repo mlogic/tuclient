@@ -78,7 +78,9 @@ class Setter(SetterExtensionBase):
 
         # Load settings for the common setters from config. Parameters are ground by their
         # intervals.
-        parameter_names = config.get_config()['common_setters_params'].split(', ')
+        parameter_names = [x.strip() for x in config.get_config()['common_setters_params'].split(',')]
+        # Sort parameters by names so that PI data are comparable as long as user
+        # supplies the same parameters regardless of their order.
         parameter_names.sort()
         # Parameters grouped by interval
         self._parameters = dict()                      # type: Dict[int, List[ParameterInfo]]
@@ -153,7 +155,6 @@ class Setter(SetterExtensionBase):
                 else:
                     param_type = 'categorical'
                     # Categorical value. Splitted by ',' and stripped of space.
-                    cand_val_str
                     cand_categorical_values = [x.strip() for x in cand_val_str.split(',')]
                     if cand_val_str.strip()[-1] == ',':
                         cand_categorical_values.append('')
