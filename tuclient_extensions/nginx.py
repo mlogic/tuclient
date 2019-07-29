@@ -26,6 +26,8 @@ import signal
 from tuclient_extensions import get_pids
 
 
-def reload_nginx_config_file():
+def reload_nginx_config_file(logger=None):
     for pid in get_pids('bin/nginx'):
-        os.kill(pid, signal.SIGUSR1)
+        if logger is not None:
+            logger.debug('Sending SIGUSR1 to {pid}'.format(pid=pid))
+        os.kill(pid, signal.SIGHUP)

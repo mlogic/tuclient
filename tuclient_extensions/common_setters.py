@@ -235,7 +235,7 @@ class Setter(SetterExtensionBase):
 
         # Call all unique post_set functions
         for i in post_set_funcs_to_call:
-            self._post_set_funcs[i]()
+            self._post_set_funcs[i](self._logger)
 
     @property
     @overrides(SetterExtensionBase)

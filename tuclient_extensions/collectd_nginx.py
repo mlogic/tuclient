@@ -175,8 +175,11 @@ class Getter(GetterExtensionBase):
             normalizer = self.__dict__[data_type[1]]
             outgoing_values[i] = clip(pi_data[name] / normalizer - 1, -1, 1)
             if pi_data[name] > normalizer * 2:
-                self._logger.warning('Collected {name}: {value} is larger than its normalize factor and is normalized to {outgoing_value}. Increase its normalize factor!'.format(
-                    name=name, value=pi_data[name], outgoing_value=outgoing_values[i]))
+                err_msg = 'Collected {name}: {value} is larger than its normalize factor '\
+                          'and is normalized to {outgoing_value}. Increase its normalize factor!'.format(
+                              name=name, value=pi_data[name], outgoing_value=outgoing_values[i])
+                self._logger.warning(err_msg)
+                raise ValueError(err_msg)
             else:
                 self._logger.debug('Collected {name}: {value}, normalized to {outgoing_value}'.format(
                     name=name, value=pi_data[name], outgoing_value=outgoing_values[i]))
