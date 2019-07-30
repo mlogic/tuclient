@@ -179,7 +179,6 @@ class Getter(GetterExtensionBase):
                           'and is normalized to {outgoing_value}. Increase its normalize factor!'.format(
                               name=name, value=pi_data[name], outgoing_value=outgoing_values[i])
                 self._logger.warning(err_msg)
-                raise ValueError(err_msg)
             else:
                 self._logger.debug('Collected {name}: {value}, normalized to {outgoing_value}'.format(
                     name=name, value=pi_data[name], outgoing_value=outgoing_values[i]))
