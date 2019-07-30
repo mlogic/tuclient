@@ -29,5 +29,5 @@ from tuclient_extensions import get_pids
 def reload_nginx_config_file(logger=None):
     for pid in get_pids('bin/nginx'):
         if logger is not None:
-            logger.debug('Sending SIGUSR1 to {pid}'.format(pid=pid))
+            logger.debug('Sending SIGHUP to {pid}'.format(pid=pid))
         os.kill(pid, signal.SIGHUP)
