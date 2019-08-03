@@ -118,8 +118,8 @@ class TestTUClient(unittest.TestCase):
             mock_pi_names = ['pi1', 'pi2']
 
             @overrides(GetterExtensionBase)
-            def collect(self):
-                # type: () -> List[float]
+            def collect(self, _interval=-1, _required_time=-1):
+                # type: (int, int) -> List[float]
                 global _total_collects
                 _total_collects += 1
                 return [0.11, 0.22]

@@ -31,7 +31,7 @@ class GetterExtensionBase(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, logger, host, config, name=''):
-        # type: (logging.Logger, str, Optional[ConfigBase]) -> None
+        # type: (logging.Logger, str, Optional[ConfigBase], str) -> None
         self._logger = logger
         self._host = host
         self._config = config
@@ -43,9 +43,20 @@ class GetterExtensionBase(object):
         pass
 
     @abc.abstractmethod
-    def collect(self):
-        # type: () -> List[float]
-        """Collect Performance Indicators"""
+    def collect(self, interval=-1, required_time=-1):
+        # type: (int, int) -> List[float]
+        """Collect Performance Indicators
+
+        Collect all PIs that have the desired collection interval for the specified
+        required_time.
+
+        For test cases, if all parameters have the same interval, we can set interval
+        to -1 and the actions will be applied to all parameters. The behavior is
+        undefined if the parameters have more than one interval.
+
+        :param interval: intervals for this batch of actions
+        :param required_time: the required time of data
+        """
         pass
 
     @property

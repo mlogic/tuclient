@@ -21,5 +21,5 @@ __copyright__ = 'Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>. Al
 __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
-from .setter_misc import *
+from .getter_setter_misc import *
 from .zmq_protocol import *

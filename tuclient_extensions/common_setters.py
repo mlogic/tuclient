@@ -23,7 +23,7 @@ __docformat__ = 'reStructuredText'
 
 import functools
 import importlib
-from .setter_misc import *
+from .getter_setter_misc import *
 import re
 from tuclient import *
 # typing.NamedTuple is better than collections.namedtuple because the former allows
@@ -145,6 +145,7 @@ class Setter(SetterExtensionBase):
                 cand_val_str = config.get_config()[name + '_candidate_values']
                 m = re.match(r"\[(\d+)[, ]*(\d+)\]", cand_val_str)
                 if m is not None:
+                    # m.group(0) is the entire match, so what we need are group(1) and group(2)
                     calc_param_value_func = functools.partial(param_value_from_range, float(m.group(1)),
                                                               float(m.group(2)))
                     param_type = 'range'

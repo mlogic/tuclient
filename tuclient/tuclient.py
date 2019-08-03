@@ -214,9 +214,12 @@ class TUClient:
                         # When self._tick_len == 0, we wait until force_collect.
                         if (self._tick_len > 0 and ts >= self._next_collect_time) or \
                            (self._tick_len == 0 and self._force_collect):
+                            self._logger.debug('Time is reached to do collection. Starting...')
+                            # requested_collect_time will be sent to getters to indicate the time of
+                            # data we want to collect. We get it before updating the next_collect_time.
+                            requested_collect_time = self._next_collect_time
                             # last_collect_time and next_collect_time must be updated *before* collecting
                             # to prevent skipping of a collection if the collection is longer than a tick_len
-                            self._logger.debug('Time is reached to do collection. Starting...')
                             if self._tick_len > 0:
                                 self._last_collect_time = ts
                                 self._update_next_collect_time()
@@ -229,7 +232,7 @@ class TUClient:
                             for g in self._getters:
                                 self._logger.debug("Starting to collect data from getter '{getter_name}'".
                                                    format(getter_name=g.name))
-                                d = g.collect()
+                                d = g.collect(self._tick_len, requested_collect_time)
                                 if d is None or len(d) == 0:
                                     self._logger.warning("Client node {node_name} getter '{getter_name}' did not return"
                                                          " any data".format(node_name=self._node_name,

@@ -1,4 +1,4 @@
-"""Functions for calculation parameter values"""
+"""Misc. functions used by all getters and setters"""
 # Copyright (c) 2017-2019 Yan Li, TuneUp.ai <yanli@tuneup.ai>.
 # All rights reserved.
 #
@@ -49,6 +49,12 @@ def get_pids(name):
             result.append(pid)
 
     return result
+
+
+def normalize_from_range(a, b, n):
+    # type: (float, float, float) -> float
+    """Normalize n (in range (a,b)) to [-1,1]"""
+    return (n - a) / ((b - a) / 2) - 1
 
 
 def param_value_from_range(a, b, n, action_values):

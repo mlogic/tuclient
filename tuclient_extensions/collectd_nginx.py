@@ -146,8 +146,8 @@ class Getter(GetterExtensionBase):
         self._collectd.start()
 
     @overrides(GetterExtensionBase)
-    def collect(self):
-        # type: () -> List[float]
+    def collect(self, _interval=-1, _required_time=-1):
+        # type: (int, int) -> List[float]
         """Collect Performance Indicators"""
         start_ts = monotonic_time()
         while self._pi_data is None:

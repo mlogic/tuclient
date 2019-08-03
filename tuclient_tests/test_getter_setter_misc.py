@@ -23,7 +23,7 @@ __license__ = 'LGPLv2.1'
 __docformat__ = 'reStructuredText'
 
 
-from tuclient_extensions.setter_misc import *
+from tuclient_extensions.getter_setter_misc import *
 import unittest
 
 
