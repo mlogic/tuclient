@@ -168,14 +168,24 @@ class ConfigBase(object):
         """Get the getter module name
 
         :return: getter module name"""
-        return self.get_config().get('getter_module', None)
+        getter_module_str = self.get_config().get('getter_module', None)
+        if getter_module_str is not None:
+            getter_module_str = getter_module_str.strip()
+            if len(getter_module_str) == 0:
+                getter_module_str = None
+        return getter_module_str
 
     def setter_module(self):
         # type: () -> Optional[str]
         """Get the setter module name
 
         :return: setter module name"""
-        return self.get_config().get('setter_module', None)
+        setter_module_str = self.get_config().get('setter_module', None)
+        if setter_module_str is not None:
+            setter_module_str = setter_module_str.strip()
+            if len(setter_module_str) == 0:
+                setter_module_str = None
+        return setter_module_str
 
     def pidfile(self):
         # type: () -> Optional[str]
