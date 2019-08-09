@@ -179,10 +179,11 @@ if __name__ == '__main__':
         logger.info('Creating the client instance')
         # Always start sending PI right away. In the future we can add an argument to tuclientd.py to disable
         # this if necessary.
+        tgc = TuningGoalCalculatorRegex(logger, config, pi_names, tuning_goal_regex)
         client = TUClient(logger, client_id, cluster_name=cluster_name, node_name=node_name,
                           api_secret_key=api_secret_key, protocol=protocol, getters=getters, setters=setters,
-                          network_timeout=network_timeout, tuning_goal_name=tuning_goal_regex,
-                          tuning_goal_calculator=TuningGoalCalculatorRegex(logger, config, pi_names, tuning_goal_regex),
+                          network_timeout=network_timeout, tuning_goal_name=tgc.tuning_goal_name,
+                          tuning_goal_calculator=tgc,
                           sending_pi_right_away=True, **tuclient_kwargs)
         logger.info('Client instance is created')
 

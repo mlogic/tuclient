@@ -38,6 +38,16 @@ class TuningGoalCalculatorBase:
         self._pi_names = pi_names
         self._tuning_goal_names = tuning_goal_names
 
+    @abc.abstractproperty
+    def tuning_goal_name(self):
+        # type: () -> str
+        """Get the tuning goal name
+
+        The tuning goal name could be different from the passed in tuning_goal_names.
+        For instance, an implementation could accept a regex as tuning_goal_names and
+        return the real PI name from pi_names that matches the regex."""
+        pass
+
     @abc.abstractmethod
     def get_tuning_goal(self, pis):
         # type: (List[float]) -> float
@@ -56,10 +66,21 @@ class TuningGoalCalculatorRegex(TuningGoalCalculatorBase):
                 self._tuning_goal_pi_index += [index]
         if len(self._tuning_goal_pi_index) == 0:
             # No match
-            raise ValueError('No PI name matches tuning_goal_regex ' + tuning_goal_names)
+            self._logger.warning('No PI name matches tuning_goal_regex ' + tuning_goal_names)
+
+        # Concatenate all matching PI names to form one tuning_goal_name.
+        # If there's no match, self._tuning_goal_name will be '', which is expected.
+        self._tuning_goal_name = '_'.join([pi_names[i] for i in self._tuning_goal_pi_index])
+
+    @property
+    def tuning_goal_name(self):
+        # type: () -> str
+        return self._tuning_goal_name
 
     def get_tuning_goal(self, pis):
         # type: (List[float]) -> float
+        if len(self._tuning_goal_pi_index) == 0:
+            return 0
         # Make sure the PIs are of the right dimension
         assert len(pis) == len(self._pi_names)
         result = 0
