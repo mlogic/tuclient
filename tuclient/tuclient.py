@@ -451,7 +451,7 @@ class TUClient:
             elif msg_code == ProtocolCode.NOT_AUTH:
                 self._logger.error('Client node {node_name} not authenticated. Try reconnecting...'
                                    .format(node_name=self._node_name))
-                return
+                raise TUTimeoutError('Client node {node_name} not authenticated.'.format(node_name=self._node_name))
             elif msg_code == ProtocolCode.BAD_PI_DATA:
                 self._logger.error('Client node {node_name} received bad PI data error. Exiting.'
                                    .format(node_name=self._node_name))
