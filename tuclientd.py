@@ -124,7 +124,7 @@ if __name__ == '__main__':
         # Setter modules
         setter_module_str = config.setter_module()
         if setter_module_str is not None:
-            for setter_module_name in setter_module_str.split(', '):
+            for setter_module_name in [x.strip() for x in setter_module_str.split(',')]:
                 logger.info('Loading setter ' + setter_module_name)
                 setter_module = importlib.import_module(setter_module_name)
                 setter_class = getattr(setter_module, 'Setter')
@@ -136,7 +136,7 @@ if __name__ == '__main__':
         # Getter modules
         getter_module_str = config.getter_module()
         if getter_module_str is not None:
-            for getter_module_name in getter_module_str.split(', '):
+            for getter_module_name in [x.strip() for x in getter_module_str.split(',')]:
                 logger.info('Loading getter ' + getter_module_name)
                 getter_module = importlib.import_module(getter_module_name)
                 getter_class = getattr(getter_module, 'Getter')
@@ -174,16 +174,20 @@ if __name__ == '__main__':
         # tuning_goal
         tuning_goal_regex = config.tuning_goal_regex()
         if tuning_goal_regex is None:
-            raise ValueError('tuning_goal_regex is not set.')
+            logger.info('tuning_goal_regex is not set.')
+            tuning_goal_calculator = None
+            tuning_goal_name = ''
+        else:
+            tuning_goal_calculator = TuningGoalCalculatorRegex(logger, config, pi_names, tuning_goal_regex)
+            tuning_goal_name = tuning_goal_calculator.tuning_goal_name
 
         logger.info('Creating the client instance')
         # Always start sending PI right away. In the future we can add an argument to tuclientd.py to disable
         # this if necessary.
-        tgc = TuningGoalCalculatorRegex(logger, config, pi_names, tuning_goal_regex)
         client = TUClient(logger, client_id, cluster_name=cluster_name, node_name=node_name,
                           api_secret_key=api_secret_key, protocol=protocol, getters=getters, setters=setters,
-                          network_timeout=network_timeout, tuning_goal_name=tgc.tuning_goal_name,
-                          tuning_goal_calculator=tgc,
+                          network_timeout=network_timeout, tuning_goal_name=tuning_goal_name,
+                          tuning_goal_calculator=tuning_goal_calculator,
                           sending_pi_right_away=True, **tuclient_kwargs)
         logger.info('Client instance is created')
 
