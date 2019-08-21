@@ -113,7 +113,7 @@ class TUClient:
         self._getters = getters
         self._setters = setters
         self._tuning_goal_name = tuning_goal_name if tuning_goal_name is not None else ''
-        # We don't need the tuning_goal_calculator is tuning_goal_name is empty, which means that
+        # We don't need the tuning_goal_calculator if tuning_goal_name is empty, which means that
         # this client won't be submitting any tuning goal.
         self._tuning_goal_calculator = tuning_goal_calculator if len(self._tuning_goal_name) > 0 else None
         self._tick_len = tick_len
@@ -253,7 +253,8 @@ class TUClient:
 
                                 if self._tuning_goal_calculator is None:
                                     tuning_goal_payload = []
-                                    self._logger.debug('Client node {node_name} has no tuning goal')
+                                    self._logger.debug('Client node {node_name} has no tuning goal'
+                                                       .format(node_name=self._node_name))
                                 else:
                                     tuning_goal = self._tuning_goal_calculator.get_tuning_goal(pi_data)
                                     assert -1 <= tuning_goal <= 1
