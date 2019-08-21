@@ -68,7 +68,7 @@ class Setter(SetterExtensionBase):
         :param config: a ConfigBase instance for accessing configuration options
         """
         super(Setter, self).__init__(logger, host, config, 'common_setters')
-        for config_file in config.get_config()['common_setters_config_files'].split(', '):
+        for config_file in [x.strip() for x in config.get_config()['common_setters_config_files'].split(',')]:
             if not os.path.isabs(config_file):
                 config_file = self._find_config_file_abspath(config_file)
             logger.info(f'Loading common setters config file {config_file} '
