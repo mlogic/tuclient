@@ -68,7 +68,7 @@ def start_tuning_handler(sub_args):
     if gateway_node_count == desired_node_count:
         logging.error('Tuning is started successfully.')
     else:
-        logging.error("Tuning can't be started, because desired_node_count {desired_node_count} doesn't match gateway's actual node count {actual_node_count}".format(desired_node_count=desired_node_count, actual_node_count=actual_node_count))
+        logging.error("Tuning can't be started, because desired_node_count {desired_node_count} doesn't match gateway's actual node count {actual_node_count}".format(desired_node_count=desired_node_count, actual_node_count=gateway_node_count))
         exit(1)
 
 
