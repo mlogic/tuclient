@@ -48,13 +48,14 @@ class TestCommonSetter(unittest.TestCase):
         self._tuclient_config = tuclient.ConfigFile(None, 'tuclient', None,
                                                     os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                                  'test_common_setter.conf', ))
+        self._thread_exception = False
 
     def test_change_config_file(self):
         setter = common_setters.Setter(self._logger, 'host1', self._tuclient_config)
-        self.assertListEqual(['host1/nginx_open_file_cache', 'host1/nginx_sendfile/on',
-                              'host1/nginx_sendfile/off', 'host1/nginx_worker_connections'], setter.parameter_names)
+        self.assertListEqual(['host1/nginx_worker_connections', 'host1/nginx_open_file_cache',
+                              'host1/nginx_sendfile/on', 'host1/nginx_sendfile/off', ], setter.parameter_names)
         setter.start()
-        setter.action(10, [0, 0.4, 0.5, -1])
+        setter.action(10, [-1, 0, 0.4, 0.5])
         self.assertTrue(filecmp.cmp(self._tmp_nginx_conf, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                                        'expected_test_common_setter_nginx.conf',)))
 
@@ -69,6 +70,14 @@ class TestCommonSetter(unittest.TestCase):
                 print('Timeout. Client1 failed to change the NGINX config file.')
                 os._exit(1)
 
+    def _tuclient_thread_func(self, client):
+        # type: (tuclient.TUClient) -> None
+        try:
+            client.start()
+        except Exception as err:
+            self._logger.error(f'TUClient thread fatal error: {type(err).__name__}: {str(err)}')
+            self._thread_exception = True
+
     def test_nginx_setter_with_tugateway(self):
         """Test the NGINX setter with a tugateway"""
         gateway_addr = 'tcp://127.0.0.1:7777'
@@ -82,7 +91,7 @@ class TestCommonSetter(unittest.TestCase):
                                         getters=[], setters=[common_setters.Setter(self._logger, 'host1',
                                                                                    self._tuclient_config)],
                                         network_timeout=5, tuning_goal_name=None, tuning_goal_calculator=None)
-            client1_thread = Thread(target=client1.start)
+            client1_thread = Thread(target=self._tuclient_thread_func, args=(client1,))
             client1_thread.start()
             try:
                 # Create a controller to talk to client1
@@ -99,14 +108,14 @@ class TestCommonSetter(unittest.TestCase):
                         os._exit(1)
 
                 # Send first action
-                gw.action_data = [0.8, 1, -1, 0.9]
+                gw.action_data = [0.9, 0.8, 1, -1]
                 gw.do_an_action = True
                 self._wait_for_file(self._tmp_nginx_conf,
                                     os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                  'expected_test_common_setter_nginx_with_tugateway.conf', ))
 
                 # Send second action
-                gw.action_data = [-0.5, -0.5, 0, 0.15]
+                gw.action_data = [0.15, -0.5, -0.5, 0]
                 gw.do_an_action = True
                 self._wait_for_file(self._tmp_nginx_conf,
                                     os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -114,6 +123,7 @@ class TestCommonSetter(unittest.TestCase):
             finally:
                 client1.stop()
                 client1_thread.join()
+                self.assertFalse(self._thread_exception)
 
     def test_param_value_from_set(self):
         self.assertEqual('tue',

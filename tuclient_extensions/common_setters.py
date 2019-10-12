@@ -38,7 +38,6 @@ from typing import Callable, Dict, List, NamedTuple, Set
 # from the float value between -1 and 1 that we receive from the engine.
 ParameterInfo = NamedTuple('ParameterInfo', [('full_name', str),
                                              ('short_name', Optional[str]),
-                                             ('config_file', Optional[str]),
                                              ('calc_param_value_func', Optional[Callable]),
                                              ('post_set_func_index', Optional[int])])
 # The mapping from an action's index to its post_set function's index
@@ -79,9 +78,11 @@ class Setter(SetterExtensionBase):
         # Load settings for the common setters from config. Parameters are ground by their
         # intervals.
         parameter_names = [x.strip() for x in config.get_config()['common_setters_params'].split(',')]
-        # Sort parameters by names so that PI data are comparable as long as user
-        # supplies the same parameters regardless of their order.
-        parameter_names.sort()
+        # We used to sort parameters by names, so that PI data are comparable as long as user
+        # supplies the same parameters regardless of their order. But we stopped doing that
+        # because the order of parameter is important. For instance, it decides the order of
+        # which they are written to FIFOs.
+        # parameter_names.sort()
         # Parameters grouped by interval
         self._parameters = dict()                      # type: Dict[int, List[ParameterInfo]]
         # A map from config file names to config file data
@@ -150,12 +151,12 @@ class Setter(SetterExtensionBase):
                                                               float(m.group(2)))
                     param_type = 'range'
                     self._parameters[interval].append(
-                        ParameterInfo(param_full_name, name, config_file, calc_param_value_func,
+                        ParameterInfo(param_full_name, name, calc_param_value_func,
                                       post_set_func_index))
                     self._parameter_names.append(param_full_name)
                 else:
                     param_type = 'categorical'
-                    # Categorical value. Splitted by ',' and stripped of space.
+                    # Categorical value. Split by ',' and stripped of space.
                     cand_categorical_values = [x.strip() for x in cand_val_str.split(',')]
                     if cand_val_str.strip()[-1] == ',':
                         cand_categorical_values.append('')
@@ -168,7 +169,6 @@ class Setter(SetterExtensionBase):
                             # Only the first is added with full parameter information
                             self._parameters[interval].append(ParameterInfo(param_full_name_with_cat_value,
                                                                             name,
-                                                                            config_file,
                                                                             calc_param_value_func,
                                                                             post_set_func_index))
 
@@ -176,13 +176,13 @@ class Setter(SetterExtensionBase):
                             self._parameters[interval].append(ParameterInfo(param_full_name + '/' + cand_value,
                                                                             None,
                                                                             None,
-                                                                            None,
                                                                             None))
                 logger.info('Loaded {type} parameter: name {param_full_name}, set interval {interval}, '
                             'config_file {config_file}, candidate values {cand_val_str}'.format(
                                 type=param_type, param_full_name=param_full_name, interval=interval,
                                 config_file=config_file, cand_val_str=cand_val_str))
-
+            elif name + '_fifo_file' in config.get_config():
+                pass
             elif name + '_sysctl' in config.get_config():
                 raise NotImplementedError('Common setter {name} requires sysctl interface, which is not implemented '
                                           'yet.'.format(name=name))
